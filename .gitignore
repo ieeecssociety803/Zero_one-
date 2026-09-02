@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+backend/__pycache__/
+*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.log
+
+# IDE & Editor files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.gemini/
