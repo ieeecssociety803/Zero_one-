@@ -72,8 +72,7 @@ export function stopSpeaking() {
 }
 
 /**
- * Foolproof Multilingual Text-To-Speech
- * Uses backend gTTS audio stream for instant, 100% natural pronunciation in Malayalam/Hindi/Tamil
+ * Foolproof Multilingual Text-To-Speech with dynamic host support
  */
 export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {}) {
   stopSpeaking();
@@ -84,9 +83,13 @@ export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {
 
   const targetLang = lang.toLowerCase();
 
+  // Dynamic host determination so audio plays on both desktop and mobile
+  const host = window.location.hostname || '127.0.0.1';
+  const backendHost = (host !== 'localhost' && host !== '127.0.0.1') ? host : '127.0.0.1';
+
   if (targetLang !== 'en') {
     try {
-      const audioUrl = `http://127.0.0.1:8000/api/tts?text=${encodeURIComponent(clean)}&lang=${targetLang}`;
+      const audioUrl = `http://${backendHost}:8000/api/tts?text=${encodeURIComponent(clean)}&lang=${targetLang}`;
       currentAudio = new Audio(audioUrl);
       
       currentAudio.onplay = () => {
@@ -111,7 +114,7 @@ export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {
       }
       return;
     } catch (e) {
-      console.warn('Backend TTS error:', e);
+      console.warn('Backend TTS error, falling back:', e);
     }
   }
 
@@ -149,8 +152,8 @@ function fallbackSpeechSynthesis(cleanText, targetLang, onStart, onEnd) {
 }
 
 /**
- * Rock-solid Continuous Voice Recognition (STT)
- * Prevents premature reset/stopping on pauses and ambient noise
+ * Clean Non-Glitching Voice Recognition (STT) for Desktop and Mobile
+ * Avoids browser re-entry permission flicker loops
  */
 export class VoiceRecognition {
   constructor(lang = 'en-IN', onResult, onError, onEnd) {
@@ -160,13 +163,11 @@ export class VoiceRecognition {
     this.onResult = onResult;
     this.onError = onError;
     this.onEnd = onEnd;
-    this.shouldKeepListening = false;
-    this.silenceTimer = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true; // KEEP CONTINUOUS SO IT DOES NOT SUDDENLY STOP
+      this.recognition.continuous = false; // Clean single-session prevents desktop permission flicker
       this.recognition.interimResults = true;
       this.recognition.lang = lang;
 
@@ -186,37 +187,16 @@ export class VoiceRecognition {
         if (this.onResult && currentText) {
           this.onResult(currentText, Boolean(finalTranscript));
         }
-
-        // Reset silence timeout on speech activity
-        if (this.silenceTimer) clearTimeout(this.silenceTimer);
-        if (finalTranscript && finalTranscript.trim().length > 3) {
-          this.silenceTimer = setTimeout(() => {
-            if (this.isListening) {
-              this.stop();
-            }
-          }, 2200); // 2.2 seconds of silence after a completed sentence auto-submits
-        }
       };
 
       this.recognition.onerror = (err) => {
-        // Ignore 'no-speech' error without killing the active session
-        if (err.error === 'no-speech') {
-          return;
-        }
-        console.warn('Speech recognition error event:', err.error);
+        console.warn('Speech recognition status:', err.error);
+        this.isListening = false;
         if (this.onError) this.onError(err);
       };
 
       this.recognition.onend = () => {
-        // If user hasn't explicitly stopped it and continuous listening was requested, auto-restart
-        if (this.shouldKeepListening && this.isListening) {
-          try {
-            this.recognition.start();
-            return;
-          } catch (e) {}
-        }
         this.isListening = false;
-        this.shouldKeepListening = false;
         if (this.onEnd) this.onEnd();
       };
     }
@@ -224,29 +204,26 @@ export class VoiceRecognition {
 
   start() {
     if (!this.recognition) return false;
+    if (this.isListening) return true;
+
     try {
       this.recognition.lang = this.lang;
-      this.shouldKeepListening = true;
-      this.isListening = true;
       this.recognition.start();
+      this.isListening = true;
       return true;
     } catch (e) {
-      // If already started, ignore error
       if (e.name === 'InvalidStateError') {
         this.isListening = true;
         return true;
       }
-      console.warn('Recognition start exception:', e);
+      console.warn('Recognition start error:', e);
       this.isListening = false;
-      this.shouldKeepListening = false;
       return false;
     }
   }
 
   stop() {
-    this.shouldKeepListening = false;
-    if (this.silenceTimer) clearTimeout(this.silenceTimer);
-    if (this.recognition) {
+    if (this.recognition && this.isListening) {
       try {
         this.recognition.stop();
       } catch (e) {}

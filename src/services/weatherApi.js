@@ -1,6 +1,14 @@
-// Weather API service connecting directly to Python FastAPI Backend with fallback
+const getApiBase = () => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return `http://${host}:8000/api`;
+    }
+  }
+  return 'http://127.0.0.1:8000/api';
+};
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = getApiBase();
 
 export const WMO_WEATHER_CODES = {
   0: { label: 'Clear Sky', icon: 'Sun', severity: 'low', gradient: 'from-amber-400 to-orange-500' },
