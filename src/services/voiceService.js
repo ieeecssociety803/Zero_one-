@@ -73,8 +73,7 @@ export function stopSpeaking() {
 
 /**
  * Foolproof Multilingual Text-To-Speech
- * 1. For Malayalam / Indian languages: Uses the backend /api/tts streaming endpoint for 100% native pronunciation.
- * 2. Also leverages client-side SpeechSynthesis with instant fallback.
+ * Uses backend gTTS audio stream for instant, 100% natural pronunciation in Malayalam/Hindi/Tamil
  */
 export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {}) {
   stopSpeaking();
@@ -85,7 +84,6 @@ export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {
 
   const targetLang = lang.toLowerCase();
 
-  // For non-English languages (e.g. Malayalam, Hindi, Tamil), use the backend TTS streaming endpoint first
   if (targetLang !== 'en') {
     try {
       const audioUrl = `http://127.0.0.1:8000/api/tts?text=${encodeURIComponent(clean)}&lang=${targetLang}`;
@@ -101,24 +99,22 @@ export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {
       };
       
       currentAudio.onerror = () => {
-        // Fallback to browser speechSynthesis
         fallbackSpeechSynthesis(clean, targetLang, onStart, onEnd);
       };
 
       const playPromise = currentAudio.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
-          console.warn('Audio play autoplay restricted, trying browser speech:', err);
+          console.warn('Autoplay restricted, falling back to speech synthesis:', err);
           fallbackSpeechSynthesis(clean, targetLang, onStart, onEnd);
         });
       }
       return;
     } catch (e) {
-      console.warn('Backend TTS error, falling back:', e);
+      console.warn('Backend TTS error:', e);
     }
   }
 
-  // Fallback / English speech synthesis
   fallbackSpeechSynthesis(clean, targetLang, onStart, onEnd);
 }
 
@@ -153,7 +149,8 @@ function fallbackSpeechSynthesis(cleanText, targetLang, onStart, onEnd) {
 }
 
 /**
- * Web Speech API Voice Recognition (STT)
+ * Rock-solid Continuous Voice Recognition (STT)
+ * Prevents premature reset/stopping on pauses and ambient noise
  */
 export class VoiceRecognition {
   constructor(lang = 'en-IN', onResult, onError, onEnd) {
@@ -163,11 +160,13 @@ export class VoiceRecognition {
     this.onResult = onResult;
     this.onError = onError;
     this.onEnd = onEnd;
+    this.shouldKeepListening = false;
+    this.silenceTimer = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = false;
+      this.recognition.continuous = true; // KEEP CONTINUOUS SO IT DOES NOT SUDDENLY STOP
       this.recognition.interimResults = true;
       this.recognition.lang = lang;
 
@@ -183,18 +182,41 @@ export class VoiceRecognition {
           }
         }
 
-        if (this.onResult) {
-          this.onResult(finalTranscript || interimTranscript, Boolean(finalTranscript));
+        const currentText = finalTranscript || interimTranscript;
+        if (this.onResult && currentText) {
+          this.onResult(currentText, Boolean(finalTranscript));
+        }
+
+        // Reset silence timeout on speech activity
+        if (this.silenceTimer) clearTimeout(this.silenceTimer);
+        if (finalTranscript && finalTranscript.trim().length > 3) {
+          this.silenceTimer = setTimeout(() => {
+            if (this.isListening) {
+              this.stop();
+            }
+          }, 2200); // 2.2 seconds of silence after a completed sentence auto-submits
         }
       };
 
       this.recognition.onerror = (err) => {
-        this.isListening = false;
+        // Ignore 'no-speech' error without killing the active session
+        if (err.error === 'no-speech') {
+          return;
+        }
+        console.warn('Speech recognition error event:', err.error);
         if (this.onError) this.onError(err);
       };
 
       this.recognition.onend = () => {
+        // If user hasn't explicitly stopped it and continuous listening was requested, auto-restart
+        if (this.shouldKeepListening && this.isListening) {
+          try {
+            this.recognition.start();
+            return;
+          } catch (e) {}
+        }
         this.isListening = false;
+        this.shouldKeepListening = false;
         if (this.onEnd) this.onEnd();
       };
     }
@@ -204,21 +226,31 @@ export class VoiceRecognition {
     if (!this.recognition) return false;
     try {
       this.recognition.lang = this.lang;
-      this.recognition.start();
+      this.shouldKeepListening = true;
       this.isListening = true;
+      this.recognition.start();
       return true;
     } catch (e) {
+      // If already started, ignore error
+      if (e.name === 'InvalidStateError') {
+        this.isListening = true;
+        return true;
+      }
       console.warn('Recognition start exception:', e);
+      this.isListening = false;
+      this.shouldKeepListening = false;
       return false;
     }
   }
 
   stop() {
-    if (this.recognition && this.isListening) {
+    this.shouldKeepListening = false;
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
+    if (this.recognition) {
       try {
         this.recognition.stop();
       } catch (e) {}
-      this.isListening = false;
     }
+    this.isListening = false;
   }
 }
