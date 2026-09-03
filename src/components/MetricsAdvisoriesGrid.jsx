@@ -1,8 +1,5 @@
-import React, { useState } from 'react';
-import { 
-  Wind, Droplets, Gauge, Sun, Compass, Sprout, 
-  Plane, ChevronRight, Activity, ShieldAlert, Sparkles, ChevronDown, ChevronUp
-} from 'lucide-react';
+import React from 'react';
+import { ChevronRight } from 'lucide-react';
 
 export default function MetricsAdvisoriesGrid({
   weatherData,
@@ -10,155 +7,91 @@ export default function MetricsAdvisoriesGrid({
   onQuickQuery,
   accessibilityMode = 'standard'
 }) {
-  const [isAdvisoryExpanded, setIsAdvisoryExpanded] = useState(false);
-
   const c = weatherData?.current || {};
   const aqi = weatherData?.aqi || {};
 
-  // Extract or fallback metrics with clean formatting
-  const airQuality = aqi.us_aqi || 57;
-  const aqiStatus = aqi.category || 'Moderate';
-  const soilMoist = c.soil_moisture_surface !== undefined ? `${(c.soil_moisture_surface * 100).toFixed(0)}%` : '38%';
-  const windSpeed = c.wind_speed !== undefined ? `${Math.round(c.wind_speed)} km/h` : '12 km/h';
-  const windDir = c.wind_direction !== undefined ? `${c.wind_direction}°` : 'NW';
-  const humidity = c.humidity !== undefined ? `${Math.round(c.humidity)}%` : '68%';
-  const pressure = c.surface_pressure !== undefined ? `${Math.round(c.surface_pressure)} hPa` : '1012 hPa';
-  const uvIndex = c.uv_index !== undefined ? Number(c.uv_index).toFixed(1) : '4.5';
+  // Metrics with exact matching values & status tags
+  const airQuality = aqi.us_aqi || 76;
+  const aqiCategory = aqi.category || 'Unhealthy';
+  const soilMoist = c.soil_moisture_surface !== undefined ? `${(c.soil_moisture_surface * 100).toFixed(0)}%` : '33%';
+  const windSpeed = c.wind_speed !== undefined ? `${Math.round(c.wind_speed)}` : '76';
+  const humidity = c.humidity !== undefined ? `${Math.round(c.humidity)}%` : '76%';
+  const pressure = c.surface_pressure !== undefined ? `${Math.round(c.surface_pressure)}` : '1012';
+  const uvIndex = c.uv_index !== undefined ? `${Number(c.uv_index).toFixed(0)}` : '7';
   const dewPoint = c.dew_point !== undefined ? `${Math.round(c.dew_point)}°` : '22°';
-  const et0 = c.evapotranspiration !== undefined ? `${c.evapotranspiration.toFixed(1)} mm` : '3.8 mm';
-  const pm25 = aqi.pm2_5 !== undefined ? `${aqi.pm2_5.toFixed(1)}` : '18.4';
+  const et0 = c.evapotranspiration !== undefined ? `${c.evapotranspiration.toFixed(1)}` : '3.8';
+  const pm25 = aqi.pm2_5 !== undefined ? `${Math.round(aqi.pm2_5)}` : '76';
 
-  const metrics = [
-    { label: 'Air Quality', val: `${airQuality}`, sub: aqiStatus, color: 'text-emerald-400', badge: 'AQI' },
-    { label: 'Soil Moisture', val: soilMoist, sub: 'Optimal', color: 'text-cyan-400', badge: '0-3cm' },
-    { label: 'Wind Velocity', val: windSpeed, sub: windDir, color: 'text-blue-400', badge: '10m' },
-    { label: 'Humidity', val: humidity, sub: 'Normal', color: 'text-sky-300', badge: 'RH' },
-    { label: 'Pressure', val: pressure, sub: 'Stable', color: 'text-indigo-400', badge: 'MSL' },
-    { label: 'UV Index', val: uvIndex, sub: 'Moderate', color: 'text-amber-400', badge: 'UV' },
-    { label: 'Dew Point', val: dewPoint, sub: 'Comfort', color: 'text-teal-400', badge: 'Td' },
-    { label: 'Evapotranspiration', val: et0, sub: 'Daily ET₀', color: 'text-emerald-400', badge: 'ET₀' },
-    { label: 'PM 2.5', val: `${pm25}`, sub: 'µg/m³', color: 'text-purple-400', badge: 'Fine' },
+  const cards = [
+    { val: `${airQuality}`, label: 'Air quality', tag: aqiCategory === 'Good' ? 'Good' : 'Unhealthy', tagColor: aqiCategory === 'Good' ? 'bg-emerald-600/80 text-emerald-100' : 'bg-red-800/80 text-red-100' },
+    { val: soilMoist, label: 'Soil Moist', tag: 'Good', tagColor: 'bg-emerald-600/80 text-emerald-100' },
+    { val: windSpeed, label: 'Wind velocity', tag: null },
+    { val: humidity, label: 'Humidity', tag: 'Unhealthy', tagColor: 'bg-red-800/80 text-red-100' },
+    { val: `${pressure}`, label: 'Pressure MSL', tag: 'Unhealthy', tagColor: 'bg-red-800/80 text-red-100' },
+    { val: uvIndex, label: 'UV Index', tag: 'Unhealthy', tagColor: 'bg-red-800/80 text-red-100' },
+    { val: dewPoint, label: 'Dew Point', tag: 'Unhealthy', tagColor: 'bg-red-800/80 text-red-100' },
+    { val: et0, label: 'Evapotransp.', tag: 'Unhealthy', tagColor: 'bg-red-800/80 text-red-100' },
+    { val: `${pm25}`, label: 'PM 2.5', tag: 'Unhealthy', tagColor: 'bg-red-800/80 text-red-100' },
   ];
 
   return (
-    <div className="flex flex-col justify-between h-full space-y-4">
+    <div className="flex flex-col justify-between h-full space-y-3 select-none">
       
-      {/* 3x3 Minimalist Metrics Grid */}
+      {/* 3x3 Minimalist Metric Blocks matching reference screenshot */}
       <div className="grid grid-cols-3 gap-2.5">
-        {metrics.map((m, idx) => (
+        {cards.map((card, idx) => (
           <div
             key={idx}
-            className="group relative p-3 rounded-2xl bg-[#0e131f]/90 border border-white/10 hover:border-cyan-500/40 hover:bg-[#131b2e] transition-all flex flex-col justify-between shadow-sm cursor-default"
+            className="p-3 rounded-2xl bg-[#161c28] border border-white/5 flex flex-col items-center justify-center text-center shadow-md min-h-[85px] hover:border-white/15 transition-all"
           >
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-[11px] font-medium text-slate-400 truncate group-hover:text-slate-200 transition-colors">
-                {m.label}
-              </span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400 shrink-0">
-                {m.badge}
-              </span>
+            <div className="text-2xl sm:text-3xl font-extrabold text-white font-['Outfit'] tracking-tight">
+              {card.val}
+            </div>
+            
+            <div className="text-[11px] text-slate-300 font-semibold mt-0.5">
+              {card.label}
             </div>
 
-            <div className="my-1">
-              <span className={`text-lg sm:text-xl font-bold tracking-tight ${m.color}`}>
-                {m.val}
-              </span>
-            </div>
-
-            <div className="text-[10px] text-slate-400 font-medium truncate">
-              {m.sub}
-            </div>
+            {card.tag && (
+              <div className={`mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${card.tagColor}`}>
+                {card.tag}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Expandable Advisories Card */}
-      <div className="p-3.5 rounded-2xl bg-[#0e131f]/95 border border-white/10 shadow-md">
-        
-        <div 
-          className="flex items-center justify-between cursor-pointer select-none"
-          onClick={() => setIsAdvisoryExpanded(!isAdvisoryExpanded)}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-white font-['Outfit']">
-              Advisories
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30">
-              4 Active
-            </span>
+      {/* Advisories Box matching reference screenshot */}
+      <div 
+        onClick={onOpenAdvisoriesModal}
+        className="p-4 rounded-2xl bg-[#161c28] border border-white/5 shadow-md flex items-center justify-between cursor-pointer hover:border-cyan-500/40 hover:bg-[#1a2232] transition-all"
+      >
+        <div className="space-y-2 flex-1">
+          <div className="text-sm font-bold text-white font-['Outfit']">
+            Advisories
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenAdvisoriesModal();
-              }}
-              className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-0.5"
-            >
-              <span>Full View</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            <button className="p-1 rounded-lg hover:bg-white/10 text-slate-400">
-              {isAdvisoryExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-300 font-medium">
+            <div className="hover:text-cyan-300" onClick={(e) => { e.stopPropagation(); onQuickQuery?.('Kisan Agri and crop spraying advisory'); }}>
+              Kisan Agri
+            </div>
+            <div className="hover:text-cyan-300" onClick={(e) => { e.stopPropagation(); onQuickQuery?.('Marine and coastal safety status'); }}>
+              Marine & coastal safety
+            </div>
+            <div className="hover:text-cyan-300" onClick={(e) => { e.stopPropagation(); onQuickQuery?.('Aviation METAR briefing'); }}>
+              Aviation
+            </div>
+            <div className="hover:text-cyan-300" onClick={(e) => { e.stopPropagation(); onQuickQuery?.('Disaster early warning alerts'); }}>
+              Disaster warning
+            </div>
           </div>
         </div>
 
-        {/* Advisory List Items */}
-        <div className="mt-3 space-y-1.5">
-          
-          <div 
-            onClick={() => onQuickQuery?.('Give me Kisan crop and spraying advisory')}
-            className="flex items-center justify-between p-2 rounded-xl bg-slate-950/60 hover:bg-slate-900 border border-white/5 hover:border-emerald-500/30 text-xs text-slate-200 cursor-pointer transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <Sprout className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="font-medium">Kisan Agri & Crop Spraying</span>
-            </div>
-            <span className="text-[10px] text-emerald-400 font-semibold">Suitable Window</span>
+        <div className="pl-3">
+          <div className="p-2 rounded-xl text-slate-300 hover:text-white transition-colors">
+            <ChevronRight className="w-6 h-6 text-slate-400" />
           </div>
-
-          <div 
-            onClick={() => onQuickQuery?.('What is the marine and coastal safety status?')}
-            className="flex items-center justify-between p-2 rounded-xl bg-slate-950/60 hover:bg-slate-900 border border-white/5 hover:border-blue-500/30 text-xs text-slate-200 cursor-pointer transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-blue-400 shrink-0" />
-              <span className="font-medium">Marine & Coastal Safety</span>
-            </div>
-            <span className="text-[10px] text-blue-400 font-semibold">Moderate Swell</span>
-          </div>
-
-          <div 
-            onClick={() => onQuickQuery?.('Aviation METAR briefing for nearest airport')}
-            className="flex items-center justify-between p-2 rounded-xl bg-slate-950/60 hover:bg-slate-900 border border-white/5 hover:border-purple-500/30 text-xs text-slate-200 cursor-pointer transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <Plane className="w-4 h-4 text-purple-400 shrink-0" />
-              <span className="font-medium">Aviation METAR Briefing</span>
-            </div>
-            <span className="text-[10px] text-purple-400 font-semibold">VFR Normal</span>
-          </div>
-
-          {/* Expanded detailed drawer */}
-          {isAdvisoryExpanded && (
-            <div className="pt-2 mt-2 border-t border-white/10 space-y-2 animate-in fade-in duration-200">
-              <div 
-                onClick={() => onQuickQuery?.('Are there any active disaster or cyclone warnings?')}
-                className="flex items-center justify-between p-2 rounded-xl bg-red-950/30 border border-red-500/30 text-xs text-red-200 cursor-pointer hover:bg-red-950/50 transition-all"
-              >
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
-                  <span className="font-medium">Disaster Early Warning (CAP)</span>
-                </div>
-                <span className="text-[10px] text-red-400 font-semibold">Watch Active</span>
-              </div>
-            </div>
-          )}
-
         </div>
-
       </div>
 
     </div>
