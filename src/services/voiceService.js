@@ -73,85 +73,83 @@ export function stopSpeaking() {
 
 /**
  * Foolproof Multilingual Text-To-Speech
- * If browser has native regional voice (e.g. Malayalam ml-IN), uses SpeechSynthesis.
- * If desktop browser lacks native Malayalam voice (very common on Chrome/Brave for Windows),
- * seamlessly uses high-quality online neural audio fallback so Malayalam speaks fluently in pure Malayalam!
+ * 1. For Malayalam / Indian languages: Uses the backend /api/tts streaming endpoint for 100% native pronunciation.
+ * 2. Also leverages client-side SpeechSynthesis with instant fallback.
  */
 export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {}) {
   stopSpeaking();
   if (!text || typeof window === 'undefined') return;
 
-  // Clean text of markdown/asterisks
   const clean = text.replace(/[*_#`~]/g, '').trim();
   if (!clean) return;
 
   const targetLang = lang.toLowerCase();
 
-  // 1. Check if browser has a native voice matching the language
-  if (window.speechSynthesis) {
-    const voices = window.speechSynthesis.getVoices();
-    const hasNativeVoice = voices.some(v => {
-      const vLang = (v.lang || '').toLowerCase();
-      const vName = (v.name || '').toLowerCase();
-      if (targetLang === 'ml') return vLang.startsWith('ml') || vName.includes('malayalam');
-      if (targetLang === 'hi') return vLang.startsWith('hi') || vName.includes('hindi');
-      if (targetLang === 'ta') return vLang.startsWith('ta') || vName.includes('tamil');
-      if (targetLang === 'te') return vLang.startsWith('te') || vName.includes('telugu');
-      if (targetLang === 'bn') return vLang.startsWith('bn') || vName.includes('bengali');
-      return vLang.startsWith(targetLang);
-    });
-
-    // If English or native voice is actually available in the browser, use SpeechSynthesis
-    if (hasNativeVoice || targetLang === 'en') {
-      const utterance = new SpeechSynthesisUtterance(clean);
-      const matchedVoice = voices.find(v => {
-        const vLang = (v.lang || '').toLowerCase();
-        const vName = (v.name || '').toLowerCase();
-        if (targetLang === 'ml') return vLang.startsWith('ml') || vName.includes('malayalam');
-        if (targetLang === 'hi') return vLang.startsWith('hi') || vName.includes('hindi');
-        if (targetLang === 'ta') return vLang.startsWith('ta') || vName.includes('tamil');
-        if (targetLang === 'te') return vLang.startsWith('te') || vName.includes('telugu');
-        return vLang.startsWith(targetLang);
-      });
-
-      if (matchedVoice) utterance.voice = matchedVoice;
-      utterance.lang = targetLang === 'ml' ? 'ml-IN' : targetLang === 'hi' ? 'hi-IN' : targetLang === 'ta' ? 'ta-IN' : 'en-IN';
-      utterance.rate = 0.95;
-      utterance.pitch = 1.05;
-
-      utterance.onstart = onStart;
-      utterance.onend = onEnd;
-      utterance.onerror = () => {
+  // For non-English languages (e.g. Malayalam, Hindi, Tamil), use the backend TTS streaming endpoint first
+  if (targetLang !== 'en') {
+    try {
+      const audioUrl = `http://127.0.0.1:8000/api/tts?text=${encodeURIComponent(clean)}&lang=${targetLang}`;
+      currentAudio = new Audio(audioUrl);
+      
+      currentAudio.onplay = () => {
+        onStart();
+      };
+      
+      currentAudio.onended = () => {
+        currentAudio = null;
         onEnd();
       };
+      
+      currentAudio.onerror = () => {
+        // Fallback to browser speechSynthesis
+        fallbackSpeechSynthesis(clean, targetLang, onStart, onEnd);
+      };
 
-      window.speechSynthesis.speak(utterance);
+      const playPromise = currentAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Audio play autoplay restricted, trying browser speech:', err);
+          fallbackSpeechSynthesis(clean, targetLang, onStart, onEnd);
+        });
+      }
       return;
+    } catch (e) {
+      console.warn('Backend TTS error, falling back:', e);
     }
   }
 
-  // 2. High-Quality Online Regional Audio Fallback (Guaranteed Malayalam TTS in Chrome/Brave desktop)
-  try {
-    onStart();
-    const encodedText = encodeURIComponent(clean.slice(0, 200)); // First segment
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${targetLang}&client=tw-ob&q=${encodedText}`;
-    
-    currentAudio = new Audio(ttsUrl);
-    currentAudio.onended = () => {
-      currentAudio = null;
-      onEnd();
-    };
-    currentAudio.onerror = () => {
-      currentAudio = null;
-      onEnd();
-    };
-    currentAudio.play().catch(() => {
-      onEnd();
-    });
-  } catch (err) {
-    console.warn('Audio TTS fallback error:', err);
+  // Fallback / English speech synthesis
+  fallbackSpeechSynthesis(clean, targetLang, onStart, onEnd);
+}
+
+function fallbackSpeechSynthesis(cleanText, targetLang, onStart, onEnd) {
+  if (!window.speechSynthesis) {
     onEnd();
+    return;
   }
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  const voices = window.speechSynthesis.getVoices() || [];
+  
+  const matchedVoice = voices.find(v => {
+    const vLang = (v.lang || '').toLowerCase();
+    const vName = (v.name || '').toLowerCase();
+    if (targetLang === 'ml') return vLang.startsWith('ml') || vName.includes('malayalam');
+    if (targetLang === 'hi') return vLang.startsWith('hi') || vName.includes('hindi');
+    if (targetLang === 'ta') return vLang.startsWith('ta') || vName.includes('tamil');
+    return vLang.startsWith(targetLang);
+  });
+
+  if (matchedVoice) utterance.voice = matchedVoice;
+  utterance.lang = targetLang === 'ml' ? 'ml-IN' : targetLang === 'hi' ? 'hi-IN' : targetLang === 'ta' ? 'ta-IN' : 'en-IN';
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+
+  utterance.onstart = onStart;
+  utterance.onend = onEnd;
+  utterance.onerror = () => onEnd();
+
+  window.speechSynthesis.speak(utterance);
 }
 
 /**

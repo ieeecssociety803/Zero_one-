@@ -9,7 +9,9 @@ import json
 from typing import Optional, List
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
+import httpx
 
 from services.weather_service import search_locations, fetch_comprehensive_weather, POPULAR_LOCATIONS
 from services.nwp_service import fetch_nwp_comparison
@@ -58,9 +60,7 @@ def health_check():
     }
 
 @app.get("/api/locations")
-async def get_locations(q: Optional[str] = Query(None, description="Search query for city or station")):
-    if not q:
-        return POPULAR_LOCATIONS
+async def get_locations(q: str = Query("", min_length=1, description="Location search query")):
     return await search_locations(q)
 
 @app.get("/api/weather")
@@ -76,8 +76,8 @@ async def post_chat_query(req: ChatQueryRequest):
     weather = req.current_weather
     if not weather:
         weather = await fetch_comprehensive_weather(req.lat, req.lon, req.location_name)
-
-    response = await process_nlp_query(
+    
+    return await process_nlp_query(
         query=req.query,
         current_weather=weather,
         location_name=req.location_name,
@@ -87,7 +87,37 @@ async def post_chat_query(req: ChatQueryRequest):
         api_key=req.api_key or "",
         provider=req.provider or "builtin"
     )
-    return response
+
+@app.get("/api/tts")
+async def text_to_speech_audio(
+    text: str = Query(..., description="Text to synthesize"),
+    lang: str = Query("ml", description="Language code e.g. ml, hi, ta, en")
+):
+    """
+    High-fidelity neural TTS proxy for regional languages (Malayalam, Hindi, Tamil, etc.).
+    Streams native audio seamlessly to any browser without client-side CORS issues.
+    """
+    clean_text = text.replace("*", "").replace("#", "").strip()
+    if not clean_text:
+        raise HTTPException(status_code=400, detail="Empty text")
+    
+    # Cap string length for audio streaming
+    speech_text = clean_text[:250]
+    tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang}&client=tw-ob&q={httpx.URL('', params={'q': speech_text}).params['q']}"
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(tts_url, headers=headers)
+            if res.status_code == 200:
+                return Response(content=res.content, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"TTS audio streaming error: {e}")
+    
+    raise HTTPException(status_code=500, detail="TTS generation failed")
 
 @app.get("/api/nwp")
 async def get_nwp_comparison(
@@ -98,20 +128,20 @@ async def get_nwp_comparison(
 
 @app.get("/api/advisory/agri")
 async def get_agri_advisory(
-    lat: float = Query(28.6139, description="Latitude"),
-    lon: float = Query(77.2090, description="Longitude"),
-    name: str = Query("Selected Area")
+    lat: float = Query(28.6139),
+    lon: float = Query(77.2090),
+    name: str = Query("Selected Agricultural Zone")
 ):
     weather = await fetch_comprehensive_weather(lat, lon, name)
     return generate_agri_advisory(weather)
 
 @app.get("/api/advisory/aviation")
-async def get_aviation_advisory(
-    icao: str = Query("VIDP", description="Airport ICAO code"),
+async def get_aviation_briefing(
+    icao: str = Query("VIDP", description="ICAO Airport Code e.g. VIDP, VABB, VOCI, VOBL"),
     lat: float = Query(28.5562),
     lon: float = Query(77.1000)
 ):
-    weather = await fetch_comprehensive_weather(lat, lon, icao)
+    weather = await fetch_comprehensive_weather(lat, lon, "Aerodrome")
     return generate_aviation_briefing(icao, weather)
 
 @app.get("/api/advisory/marine")
@@ -142,7 +172,6 @@ async def websocket_telemetry_stream(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            # Send periodic live telemetry heartbeat with active CAP count
             alerts = get_active_disaster_alerts()
             payload = {
                 "type": "WIS2_HEARTBEAT",
