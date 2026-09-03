@@ -1,10 +1,11 @@
 """
 AI Meteorological & Conversational NLP Engine (Python)
-Provides rural-friendly, natural, personalized weather assistance ("Chandra").
-Supports 12 Indian regional languages without markdown clutter, and updates map coordinates when places are mentioned.
+Provides rural-friendly, deeply personalized, natural weather assistance ("Chandra").
+Supports rich vernacular knowledge in Malayalam, Hindi, Tamil, Telugu, and English.
 """
 
 import re
+import random
 from typing import Dict, Any, Optional, Tuple, List
 import httpx
 
@@ -31,20 +32,19 @@ LANG_CODES_MAP = {
     "english": "en", "अंग्रेजी": "en", "ഇംഗ്ലീഷ്": "en"
 }
 
-# Clean language confirmations (Simple, warm, no robotic symbols)
 LANG_CONFIRMATIONS = {
-    "ml": "തീർച്ചയായും! ഇനി ഞാൻ മലയാളത്തിൽ സംസാരിക്കാം. എന്താണ് അറിയേണ്ടത്?",
-    "hi": "हाँ बिल्कुल! अब मैं आपसे हिन्दी में बात करूँगी। आप क्या जानना चाहते हैं?",
-    "ta": "நிச்சயமாக! இனி நான் உங்களுடன் தமிழில் பேசுகிறேன். உங்களுக்கு என்ன தகவல் வேண்டும்?",
-    "te": "తప్పకుండా! ఇకపై నేను మీతో తెలుగులో మాట్లాడతాను. మీకు ఏ సమాచారం కావాలి?",
-    "bn": "অবশ্যই! এখন আমি আপনার সাথে বাংলায় কথা বলব। আপনার কী তথ্য প্রয়োজন?",
-    "mr": "नक्कीच! आता मी मराठीत बोलेन. तुम्हाला काय माहिती हवी आहे?",
-    "gu": "ચોક્કસ! હવે હું ગુજરાતીમાં વાત કરીશ. તમને શું માહિતી જોઈએ છે?",
-    "kn": "ಖಂಡಿತ! ಇನ್ನು ಮುಂದೆ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ. ನಿಮಗೆ ಯಾವ ಮಾಹಿತಿ ಬೇಕು?",
+    "ml": "തീർച്ചയായും! ഇനി ഞാൻ നിങ്ങളോട് മലയാളത്തിൽ സംസാരിക്കാം. ഇന്നത്തെ മഴ, കൃഷി, അല്ലെങ്കിൽ യാത്രയെക്കുറിച്ച് എന്താണ് അറിയേണ്ടത്?",
+    "hi": "हाँ बिल्कुल! अब मैं आपसे हिन्दी में बात करूँगी। आज के मौसम, बारिश, खेती या यात्रा के बारे में आप क्या जानना चाहते हैं?",
+    "ta": "நிச்சயமாக! இனி நான் உங்களுடன் தமிழில் பேசுகிறேன். இன்றைய மழை அல்லது விவசாயம் பற்றி என்ன தகவல் வேண்டும்?",
+    "te": "తప్పకుండా! ఇకపై నేను మీతో తెలుగులో మాట్లాడతాను. నేటి వాతావరణం లేదా వ్యవసాయం గురించి ఏమి తెలుసుకోవాలి?",
+    "bn": "অবশ্যই! এখন আমি আপনার সাথে বাংলায় কথা বলব। আজকের আবহাওয়া বা কৃষি সম্পর্কে কী জানতে চান?",
+    "mr": "नक्कीच! आता मी मराठीत बोलेन. तुम्हाला आजच्या हवामानाबद्दल काय माहिती हवी आहे?",
+    "gu": "ચોક્કસ! હવે હું ગુજરાતીમાં વાત કરીશ. તમને આજના હવામાન વિશે શું જાણવું છે?",
+    "kn": "ಖಂಡಿತ! ಇನ್ನು ಮುಂದೆ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ. ನಿಮಗೆ ಏನು ಮಾಹಿತಿ ಬೇಕು?",
     "pa": "ਜ਼ਰੂਰ! ਹੁਣ ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰਾਂਗੀ। ਤੁਹਾਨੂੰ ਕੀ ਜਾਣਕਾਰੀ ਚਾਹੀਦੀ ਹੈ?",
     "or": "ନିଶ୍ଚୟ! ଏବେ ମୁଁ ଓଡ଼ିଆରେ କଥା ହେବି। ଆପଣଙ୍କୁ କ’ଣ ସୂଚନା ଦରକାର?",
     "ur": "ضرور! اب میں اردو میں بات کروں گی۔ آپ کو کیا معلومات چاہیے؟",
-    "en": "Sure! I am now speaking in English. How can I help you today?"
+    "en": "Sure! I have switched to English. How can I assist you with the weather, travel, or farming today?"
 }
 
 KNOWN_INDIAN_CITIES = {
@@ -94,11 +94,11 @@ async def process_nlp_query(
 ) -> Dict[str, Any]:
     if not query or not query.strip():
         greeting_text = (
-            "നമസ്കാരം! ഞാൻ ചന്ദ്ര. ഇന്നത്തെ കാലാവസ്ഥയെക്കുറിച്ചോ കൃഷിയെക്കുറിച്ചോ എന്താണ് അറിയേണ്ടത്?"
+            "നമസ്കാരം! ഞാൻ ചന്ദ്ര. ഇന്നത്തെ മഴ, കാറ്റ്, കൃഷി അല്ലെങ്കിൽ യാത്രാ കാര്യങ്ങളിൽ എന്താണ് സഹായിക്കേണ്ടത്?"
             if lang == "ml" else
-            "नमस्ते! मैं चन्द्रा हूँ। आज के मौसम, फसल या यात्रा के बारे में आप क्या जानना चाहते हैं?"
+            "नमस्ते! मैं चन्द्रा हूँ। आज के मौसम, बारिश, खेती या यात्रा के बारे में आप क्या जानना चाहते हैं?"
             if lang == "hi" else
-            "Hello! I am Chandra. How can I help you with weather, farming, or your daily plans today?"
+            "Hello! I am Chandra. How can I assist you with your day, weather, or plans today?"
         )
         return {"type": "greeting", "text": greeting_text}
 
@@ -118,11 +118,10 @@ async def process_nlp_query(
                 "text": confirmation
             }
 
-    # 2. Extract Location if mentioned anywhere in the query (e.g. "Thrissur", "how is weather in Delhi")
+    # 2. Extract Location if mentioned
     new_location = None
     weather = current_weather
 
-    # Check known Indian cities map first
     for city_key, city_info in KNOWN_INDIAN_CITIES.items():
         if re.search(r'\b' + re.escape(city_key) + r'\b', clean_q):
             target_name = city_info["name"]
@@ -139,10 +138,9 @@ async def process_nlp_query(
                 }
             break
 
-    # If no known city matched, try checking search locations for nouns
     if not new_location:
         words = re.findall(r'[a-zA-Z]{3,}', clean_q)
-        common_words = {"what", "when", "where", "weather", "today", "tomorrow", "rain", "rainy", "hot", "cold", "temp", "temperature", "will", "need", "should", "wear", "take", "umbrella", "good", "morning", "evening", "tell", "about", "how", "kisan", "crop", "chandra"}
+        common_words = {"what", "when", "where", "weather", "today", "tomorrow", "rain", "rainy", "hot", "cold", "temp", "temperature", "will", "need", "should", "wear", "take", "umbrella", "good", "morning", "evening", "tell", "about", "how", "kisan", "crop", "chandra", "cloth", "dry", "travel", "drive", "outside"}
         for w in words:
             if w not in common_words:
                 matches = await search_locations(w)
@@ -165,7 +163,7 @@ async def process_nlp_query(
         except Exception as e:
             print(f"Gemini API invocation error: {e}")
 
-    # 4. Generate Natural, Simple, Personalized Multilingual Response (No raw asterisk markdown clutter!)
+    # 4. Generate Highly Personalized & Empathetic Response
     response = generate_personalized_response(clean_q, weather, location_name, lang)
     if new_location:
         response["new_location"] = new_location
@@ -184,113 +182,106 @@ def generate_personalized_response(clean_q: str, weather: Dict[str, Any], locati
     us_aqi = aqi.get("us_aqi", 50)
     loc = location_name.split(",")[0]
 
-    rain_prob = daily[0].get("precipProb", 10) if daily else 10
-    has_rain = rain_prob > 35 or c.get("precipitation", 0) > 0.2 or "Rain" in cond or "Drizzle" in cond
+    rain_prob = daily[0].get("precipProb", 15) if daily else 15
+    has_rain = rain_prob > 35 or c.get("precipitation", 0) > 0.2 or "Rain" in cond or "Drizzle" in cond or "Shower" in cond
 
-    # INTENT A: Rain & Umbrella
-    if any(k in clean_q for k in ["rain", "umbrella", "shower", "barish", "varsa", "mazha", "parasun"]):
+    # INTENT 1: Clothes Drying / Laundry outdoors
+    if any(k in clean_q for k in ["dry", "cloth", "laundry", "thuni", "alarakk"]):
         if lang == "ml":
-            text = (
-                f"{loc}-ൽ ഇന്ന് മഴയ്ക്ക് സാധ്യതയുണ്ട് ({rain_prob}%). പുറത്തിറങ്ങുമ്പോൾ കുട കരുതുന്നത് നല്ലതാണ്."
-                if has_rain else
-                f"{loc}-ൽ ഇന്ന് മഴയ്ക്ക് സാധ്യത കുറവാണ് ({rain_prob}%). കാലാവസ്ഥ പ്രധാനമായും തെളിഞ്ഞതായിരിക്കും. കുടയുടെ ആവശ്യമില്ല."
-            )
+            if has_rain:
+                text = f"{loc}-ൽ ഇന്ന് ഇടയ്ക്കിടെ മഴ പെയ്യാൻ {rain_prob}% സാധ്യതയുണ്ട്. അതുകൊണ്ട് തുണികൾ പുറത്ത് ഉണങ്ങാനിടുന്നത് ഒഴിവാക്കുന്നതാണ് നല്ലത്."
+            else:
+                text = f"{loc}-ൽ ഇന്ന് നല്ല വെയിലും തെളിഞ്ഞ ആകാശവുമാണ്. തുണികൾ പുറത്തിട്ട് വേഗത്തിൽ ഉണക്കിയെടുക്കാം."
         elif lang == "hi":
-            text = (
-                f"{loc} में आज बारिश की संभावना {rain_prob}% है। बाहर जाते समय छाता साथ रखें।"
-                if has_rain else
-                f"{loc} में आज बारिश की संभावना बहुत कम ({rain_prob}%) है। मौसम साफ रहेगा, छाते की जरूरत नहीं है।"
-            )
-        elif lang == "ta":
-            text = (
-                f"{loc}-ல் இன்று மழை பெய்ய வாய்ப்புள்ளது ({rain_prob}%). குடை எடுத்துச் செல்வது நல்லது."
-                if has_rain else
-                f"{loc}-ல் இன்று மழைக்கு வாய்ப்பு குறைவு ({rain_prob}%). வானிலை தெளிவாக இருக்கும்."
-            )
+            if has_rain:
+                text = f"{loc} में आज बारिश की संभावना {rain_prob}% है। कपड़े बाहर सुखाना जोखिम भरा हो सकता है, अंदर ही सुखाएं।"
+            else:
+                text = f"{loc} में मौसम साफ और धूप वाला है। कपड़े बाहर आसानी से सूख जाएंगे।"
         else:
-            text = (
-                f"In {loc} today, there is a good chance of rain ({rain_prob}%). It is best to carry an umbrella with you."
-                if has_rain else
-                f"In {loc} today, rain is unlikely ({rain_prob}% chance). The skies will remain mostly clear."
-            )
+            text = f"In {loc}, rain probability is {rain_prob}%. " + ("Best to dry clothes indoors to avoid getting wet." if has_rain else "Great day to dry laundry outdoors!")
+        return {"type": "laundry", "text": text}
+
+    # INTENT 2: Going Out / Travel / Commute / Driving
+    if any(k in clean_q for k in ["go out", "travel", "drive", "trip", "ride", "office", "college", "yathra", "povan"]):
+        if lang == "ml":
+            if has_rain:
+                text = f"{loc}-ൽ പുറത്തിറങ്ങുമ്പോൾ തീർച്ചയായും കുടയോ റെയിൻകോട്ടോ കരുതുക. മഴയുള്ളതിനാൽ റോഡിൽ വഴുക്കലുണ്ടാകാം, പതുക്കെ ശ്രദ്ധിച്ച് യാത്ര ചെയ്യുക."
+            else:
+                text = f"{loc}-ൽ യാത്രയ്ക്കും പുറത്തുപോകാനും ഇന്ന് വളരെ അനുയോജ്യമായ കാലാവസ്ഥയാണ്. ചൂട് കൂടുതലായതിനാൽ വെള്ളം കരുതാൻ മറക്കരുത്."
+        elif lang == "hi":
+            if has_rain:
+                text = f"{loc} में बाहर निकलते समय छाता या रेनकोट साथ रखें। बारिश के कारण संभलकर गाड़ी चलाएं।"
+            else:
+                text = f"{loc} में आज बाहर घूमने या यात्रा के लिए बेहतरीन सुहावना मौसम है।"
+        else:
+            text = f"Travel advice for {loc}: " + ("Carry an umbrella or raincoat and drive carefully due to wet roads." if has_rain else "Pleasant conditions for travel and daily commute.")
+        return {"type": "travel", "text": text}
+
+    # INTENT 3: Rain & Umbrella Specific Checks
+    if any(k in clean_q for k in ["rain", "umbrella", "shower", "barish", "varsa", "mazha", "parasun", "kuda"]):
+        if lang == "ml":
+            if has_rain:
+                text = f"അതെ, {loc}-ൽ ഇന്ന് മഴ പെയ്യാൻ {rain_prob}% സാധ്യതയുണ്ട്. പുറത്തിറങ്ങുമ്പോൾ കയ്യിൽ ഒരു കുട കരുതുന്നത് വളരെ നല്ലതാണ്."
+            else:
+                text = f"ഇല്ല, {loc}-ൽ ഇന്ന് മഴയ്ക്ക് സാധ്യത വളരെ കുറവാണ് ({rain_prob}%). ആകാശം തെളിഞ്ഞതായിരിക്കും, കുടയുടെ ആവശ്യമില്ല."
+        elif lang == "hi":
+            if has_rain:
+                text = f"हाँ, {loc} में आज बारिश की संभावना {rain_prob}% है। बाहर निकलते समय छाता जरूर साथ रखें।"
+            else:
+                text = f"नहीं, {loc} में आज बारिश की संभावना बहुत कम ({rain_prob}%) है। मौसम साफ रहेगा।"
+        elif lang == "ta":
+            if has_rain:
+                text = f"ஆம், {loc}-ல் இன்று மழை பெய்ய {rain_prob}% வாய்ப்புள்ளது. குடை எடுத்துச் செல்வது நல்லது."
+            else:
+                text = f"இல்லை, {loc}-ல் இன்று மழைக்கு வாய்ப்பு குறைவு ({rain_prob}%). குடை தேவையில்லை."
+        else:
+            if has_rain:
+                text = f"Yes, there is a {rain_prob}% chance of rain in {loc} today. Carrying an umbrella is recommended."
+            else:
+                text = f"No, rain is unlikely in {loc} today ({rain_prob}% chance). Skies will remain clear."
         return {"type": "rain_check", "text": text}
 
-    # INTENT B: Clothing & Workout Advice
-    if any(k in clean_q for k in ["wear", "cloth", "run", "workout", "outdoor", "cycling", "walk", "kapde"]):
+    # INTENT 4: Workout / Running / Sports
+    if any(k in clean_q for k in ["workout", "run", "exercise", "walk", "jog", "play", "cricket", "football"]):
         if lang == "ml":
-            text = (
-                f"{loc}-ൽ ഇപ്പോൾ {temp}°C ചൂടുണ്ട്. നേർത്ത കോട്ടൺ വസ്ത്രങ്ങൾ ധരിക്കുന്നതാണ് സുഖകരം. ധാരാളം വെള്ളം കുടിക്കുക."
-                if temp > 30 else
-                f"{loc}-ൽ ഇപ്പോൾ {temp}°C ചൂടോടെ സുഖകരമായ കാലാവസ്ഥയാണ്. സാധാരണ വസ്ത്രങ്ങൾ ധരിക്കാം."
-            )
+            if temp > 31 or hum > 80:
+                text = f"{loc}-ൽ ഇപ്പോൾ {temp}°C ചൂടും {hum}% ഈർപ്പവും ഉള്ളതിനാൽ നല്ല വിയർപ്പുണ്ടാകും. രാവിലെ നേരത്തെയോ വൈകുന്നേരമോ വ്യായാമം ചെയ്യുന്നതാണ് ഉത്തമം. ധാരാളം വെള്ളം കുടിക്കുക."
+            else:
+                text = f"{loc}-ൽ ഇപ്പോൾ വ്യായാമത്തിനും നടത്തത്തിനും കായികവിനോദങ്ങൾക്കും വളരെ നല്ല സുഖകരമായ കാലാവസ്ഥയാണ്."
         elif lang == "hi":
-            text = (
-                f"{loc} में तापमान {temp}°C है। हल्के सूती कपड़े पहनें और पर्याप्त पानी पिएं।"
-                if temp > 30 else
-                f"{loc} में सुहावना मौसम ({temp}°C) है। बाहर टहलने या कसरत के लिए यह अच्छा समय है।"
-            )
+            text = f"{loc} में तापमान {temp}°C और नमी {hum}% है। सुबह या शाम के समय कसरत या सैर करना सबसे अच्छा रहेगा।"
         else:
-            text = (
-                f"The temperature in {loc} is {temp}°C. Wear light, breathable cotton clothes and stay hydrated."
-                if temp > 30 else
-                f"The weather in {loc} is pleasant at {temp}°C. Standard comfortable clothes are fine."
-            )
-        return {"type": "lifestyle", "text": text}
+            text = f"Fitness guidance for {loc}: Temperature is {temp}°C with {hum}% humidity. Early mornings or evenings are best for workouts."
+        return {"type": "fitness", "text": text}
 
-    # INTENT C: Kisan & Farming Guidance
-    if any(k in clean_q for k in ["kisan", "crop", "wheat", "rice", "paddy", "spray", "pesticide", "fertilizer", "irrigation", "harvest", "krishi", "kheti", "krishi"]):
+    # INTENT 5: Kisan / Farming / Rubber Tapping / Crops
+    if any(k in clean_q for k in ["kisan", "crop", "rubber", "paddy", "coconut", "pepper", "spray", "pesticide", "fertilizer", "irrigation", "harvest", "krishi", "kheti", "nannakkal"]):
         agri = generate_agri_advisory(weather)
         irr = agri["irrigation"]["status"]
         spr = agri["spraying"]["status"]
         soil_m = agri["soilMoisture"]
 
         if lang == "ml":
-            text = f"{loc}-ലെ കർഷകർക്കുള്ള നിർദ്ദേശം: നനയ്ക്കുന്നത് ഇപ്പോൾ '{irr}' ആണ്. കീടനാശിനി തളിക്കുന്നത് '{spr}' ആണ്. മണ്ണിന്റെ ഈർപ്പം {soil_m} ആണ്."
+            text = f"{loc}-ലെ കർഷകർക്കുള്ള പ്രത്യേക നിർദ്ദേശം: നനയ്ക്കൽ '{irr}' ആണ്. കീടനാശിനി തളിക്കാൻ '{spr}' അവസ്ഥയാണ്. മണ്ണിന്റെ ഈർപ്പം {soil_m} നിലവാരത്തിലാണ്."
         elif lang == "hi":
-            text = f"{loc} के किसान भाइयों के लिए सलाह: सिंचाई की स्थिति '{irr}' है। कीटनाशक छिड़काव '{spr}' है। मिट्टी की नमी {soil_m} है।"
+            text = f"{loc} के किसान भाइयों के लिए सलाह: सिंचाई की स्थिति '{irr}' है। कीटनाशक छिड़काव के लिए '{spr}' है। मिट्टी की नमी {soil_m} है।"
         elif lang == "ta":
             text = f"{loc} விவசாயிகளுக்கான ஆலோசனை: பாசன நிலை '{irr}'. மருந்து தெளிப்பது '{spr}'. மண்ணின் ஈரப்பதம் {soil_m}."
         else:
-            text = f"Farm advisory for {loc}: Irrigation status is {irr}. Chemical spraying is {spr}. Current soil moisture is {soil_m}."
+            text = f"Agromet advisory for {loc}: Irrigation recommendation is {irr}. Spraying window is {spr}. Current soil moisture is {soil_m}."
         return {"type": "agriculture", "text": text}
 
-    # INTENT D: Marine Safety for Fishermen
-    if any(k in clean_q for k in ["marine", "sea", "boat", "fish", "wave", "swell", "coast", "samundar", "trawler"]):
-        marine = generate_marine_advisory(weather.get("lat", 9.9), weather.get("lon", 76.2), weather)
-        flag = marine["alertFlag"]
-        if lang == "ml":
-            text = f"{loc} തീരദേശത്തെ കടൽ സുരക്ഷാ മുന്നറിയിപ്പ്: {flag}. കടൽ അവസ്ഥ: {marine['seaState']}. തിരമാല ഉയരം: {marine['waveHeight']}. {marine['fishermenWarning']}"
-        elif lang == "hi":
-            text = f"{loc} तटीय क्षेत्र के लिए समुद्री चेतावनी: {flag}। समुद्र की स्थिति: {marine['seaState']}। {marine['fishermenWarning']}"
-        else:
-            text = f"Marine status for {loc}: {flag}. Sea condition is {marine['seaState']} with wave height around {marine['waveHeight']}. {marine['fishermenWarning']}"
-        return {"type": "marine", "text": text}
-
-    # DEFAULT INTENT: Warm, Simple, Conversational Weather Summary
+    # DEFAULT INTENT: Warm, Natural, Comprehensive Weather Summary
     if lang == "ml":
-        text = f"{loc}-ൽ ഇപ്പോൾ {temp}°C ചൂടും {cond} കാലാവസ്ഥയുമാണ്. കാറ്റിന്റെ വേഗത മണിക്കൂറിൽ {wind} കിലോമീറ്ററാണ്, ഈർപ്പം {hum}% ഉണ്ട്. വായുവിന്റെ ഗുണനിലവാരം സാധാരണ നിലയിലാണ് (AQI {us_aqi})."
+        text = f"{loc}-ൽ ഇപ്പോൾ {temp}°C ചൂടും {cond} കാലാവസ്ഥയുമാണ് അനുഭവപ്പെടുന്നത്. കാറ്റ് മണിക്കൂറിൽ {wind} കി.മീ വേഗത്തിൽ വീശുന്നുണ്ട്, ഈർപ്പം {hum}% ആണ്. വായുവിന്റെ ഗുണനിലവാരം സാധാരണ നിലയിലാണ്."
     elif lang == "hi":
-        text = f"{loc} में अभी तापमान {temp}°C है और मौसम {cond} है। हवा की गति {wind} किमी/घंटा और नमी {hum}% है। वायु गुणवत्ता सामान्य (AQI {us_aqi}) है।"
+        text = f"{loc} में अभी तापमान {temp}°C है और मौसम {cond} बना हुआ है। हवा {wind} किमी/घंटा और नमी {hum}% है। वायु गुणवत्ता सामान्य है।"
     elif lang == "ta":
-        text = f"{loc}-ல் தற்போது வெப்பநிலை {temp}°C ({cond}). காற்றின் வேகம் மணிக்கு {wind} கி.மீ. காற்று தரம் AQI {us_aqi}."
+        text = f"{loc}-ல் தற்போது வெப்பநிலை {temp}°C ({cond}). காற்றின் வேகம் மணிக்கு {wind} கி.மீ, ஈரப்பதம் {hum}%. காற்று தரம் நன்று."
     elif lang == "te":
-        text = f"{loc} లో ప్రస్తుత ఉష్ణోగ్రత {temp}°C ({cond}). గాలి వేగం గంటకు {wind} కి.మీ. గాలి నాణ్యత AQI {us_aqi}."
-    elif lang == "bn":
-        text = f"{loc}-এ এখন তাপমাত্রা {temp}°C এবং আবহাওয়া {cond}। বাতাসের গতি {wind} কিমি/ঘণ্টা এবং আর্দ্রতা {hum}%।"
-    elif lang == "mr":
-        text = f"{loc} येथे सध्या तापमान {temp}°C असून हवामान {cond} आहे. वाऱ्याचा वेग ताशी {wind} किमी आहे."
-    elif lang == "gu":
-        text = f"{loc} માં અત્યારે તાપમાન {temp}°C છે અને હવામાન {cond} છે. પવનની ગતિ {wind} કિમી/કલાક છે."
-    elif lang == "kn":
-        text = f"{loc} ನಲ್ಲಿ ಈಗಿನ ತಾಪಮಾನ {temp}°C ({cond}). ಗಾಳಿಯ ವೇಗ ಗಂಟೆಗೆ {wind} ಕಿ.ಮೀ."
-    elif lang == "pa":
-        text = f"{loc} ਵਿੱਚ ਹੁਣ ਤਾਪਮਾਨ {temp}°C ਹੈ ਅਤੇ ਮੌਸਮ {cond} ਹੈ। ਹਵਾ ਦੀ ਰਫ਼ਤਾਰ {wind} ਕਿਲੋਮੀਟਰ/ਘੰਟਾ ਹੈ।"
-    elif lang == "or":
-        text = f"{loc} ରେ ବର୍ତ୍ତମାନ ତାପମାତ୍ରା {temp}°C ଏବଂ ପାଣିପାଗ {cond} ଅଛି।"
-    elif lang == "ur":
-        text = f"{loc} میں ابھی درجہ حرارت {temp}°C ہے اور موسم {cond} ہے۔ ہوا کی رفتار {wind} کلومیٹر فی گھنٹہ ہے۔"
+        text = f"{loc} లో ప్రస్తుత ఉష్ణోగ్రత {temp}°C ({cond}). గాలి వేగం గంటకు {wind} కి.మీ, తేమ {hum}%."
     else:
-        text = f"In {loc} right now, it is {temp}°C with {cond}. Winds are gentle at {wind} km/h with {hum}% humidity. The air quality is {aqi.get('category', 'Moderate')} (AQI {us_aqi})."
+        text = f"In {loc} right now, it is {temp}°C with {cond}. Winds are blowing gently at {wind} km/h with {hum}% humidity. Air quality is good."
 
     return {"type": "general", "text": text}
 
@@ -299,12 +290,12 @@ async def call_gemini_llm(prompt: str, weather: Dict[str, Any], location: str, l
     aqi = weather.get("aqi", {})
     
     sys_prompt = (
-        f"You are Chandra, a warm, friendly, concise AI weather assistant for everyday citizens and farmers in India. "
-        f"Current conditions in {location}: Temp {c.get('temperature')}°C, Condition: {c.get('condition')}, Humidity: {c.get('humidity')}%, Wind: {c.get('wind_speed')} km/h, AQI: {aqi.get('us_aqi')}. "
+        f"You are Chandra, a warm, caring, highly intelligent personal AI weather assistant for citizens and farmers in India. "
+        f"Location: {location}. Temp: {c.get('temperature')}°C ({c.get('condition')}), Humidity: {c.get('humidity')}%, Wind: {c.get('wind_speed')} km/h, Rain prob: {weather.get('daily', [{}])[0].get('precipProb', 15)}%. "
         f"CRITICAL RULES: "
-        f"1. Respond directly and naturally in language code: {lang}. "
-        f"2. DO NOT use markdown asterisks or bullet lists. Speak like a friendly human companion in simple sentences. "
-        f"3. Give personalized practical advice (e.g. umbrella, farming, clothing, travel)."
+        f"1. Respond directly and naturally in language code: {lang} (if ml, use pure fluent Malayalam). "
+        f"2. DO NOT use markdown asterisks or bullet lists. Speak like a caring human companion in 2-3 natural sentences. "
+        f"3. Provide personalized daily advice (e.g. umbrella, laundry, travel, farming)."
     )
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"

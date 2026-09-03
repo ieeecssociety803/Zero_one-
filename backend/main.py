@@ -4,6 +4,7 @@ Integrates meteorological datasets, NWP models, GKMS Agriculture, METAR aviation
 INCOIS Marine, ERA5 climate analytics, CAP disaster early warnings, and conversational NLP.
 """
 
+import io
 import asyncio
 import json
 from typing import Optional, List
@@ -11,7 +12,7 @@ from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect, HTTPExceptio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
-import httpx
+from gtts import gTTS
 
 from services.weather_service import search_locations, fetch_comprehensive_weather, POPULAR_LOCATIONS
 from services.nwp_service import fetch_nwp_comparison
@@ -89,35 +90,32 @@ async def post_chat_query(req: ChatQueryRequest):
     )
 
 @app.get("/api/tts")
-async def text_to_speech_audio(
+def text_to_speech_audio(
     text: str = Query(..., description="Text to synthesize"),
     lang: str = Query("ml", description="Language code e.g. ml, hi, ta, en")
 ):
     """
-    High-fidelity neural TTS proxy for regional languages (Malayalam, Hindi, Tamil, etc.).
-    Streams native audio seamlessly to any browser without client-side CORS issues.
+    High-fidelity neural TTS using gTTS for Malayalam, Hindi, Tamil, Telugu, and English.
+    Returns direct audio/mp3 stream with zero CORS/referrer blocks.
     """
-    clean_text = text.replace("*", "").replace("#", "").strip()
+    clean_text = text.replace("*", "").replace("#", "").replace("`", "").strip()
     if not clean_text:
         raise HTTPException(status_code=400, detail="Empty text")
     
-    # Cap string length for audio streaming
-    speech_text = clean_text[:250]
-    tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang}&client=tw-ob&q={httpx.URL('', params={'q': speech_text}).params['q']}"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+    # Supported gTTS codes
+    lang_code = lang.lower()
+    if lang_code not in ["ml", "hi", "ta", "te", "bn", "mr", "gu", "kn", "pa", "ur", "en"]:
+        lang_code = "en"
     
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get(tts_url, headers=headers)
-            if res.status_code == 200:
-                return Response(content=res.content, media_type="audio/mpeg")
+        fp = io.BytesIO()
+        tts = gTTS(text=clean_text[:280], lang=lang_code, slow=False)
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return Response(content=fp.read(), media_type="audio/mpeg")
     except Exception as e:
-        print(f"TTS audio streaming error: {e}")
-    
-    raise HTTPException(status_code=500, detail="TTS generation failed")
+        print(f"gTTS audio generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/nwp")
 async def get_nwp_comparison(
