@@ -80,22 +80,31 @@ function generateClientPersonalizedResponse(query, weatherData, activeLocation, 
     ? 'here in your area'
     : `in ${rawLoc}`;
 
-  const dailyPrecip = daily[0]?.precipProb ?? daily[0]?.precip_probability ?? 20;
-  
-  let rainProb = dailyPrecip;
+  // Live Synoptic Rain Probability from Open-Meteo
+  let rawProb = 0;
+  if (daily && daily.length > 0) {
+    rawProb = daily[0].precipProb ?? daily[0].precip_probability ?? 0;
+  }
+
+  const precipVal = c.precipitation || 0;
+  let rainProb = rawProb;
   let hasRainThreat = false;
 
-  if (/rain|drizzle|shower|thunder/i.test(cond)) {
-    rainProb = Math.max(dailyPrecip, 85);
+  if (precipVal > 0.1 || /rain|drizzle|shower|thunder/i.test(cond)) {
+    rainProb = Math.max(rawProb, 85);
     hasRainThreat = true;
+  } else if (rawProb > 0) {
+    rainProb = rawProb;
+    hasRainThreat = rainProb >= 35;
   } else if (/overcast/i.test(cond)) {
-    rainProb = Math.max(dailyPrecip, 65);
+    rainProb = 65;
     hasRainThreat = true;
-  } else if (/cloud/i.test(cond) || hum > 80) {
-    rainProb = Math.max(dailyPrecip, 45);
-    hasRainThreat = true;
+  } else if (/cloud/i.test(cond)) {
+    rainProb = 35;
+    hasRainThreat = false;
   } else {
-    hasRainThreat = rainProb > 35;
+    rainProb = 10;
+    hasRainThreat = false;
   }
 
   // INTENT 1: DRYING CLOTHES / LAUNDRY

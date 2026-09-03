@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Info, HelpCircle } from 'lucide-react';
 import { fetchNWPComparison } from '../services/nwpModelService';
 
 export default function NWPEnsembleSection({ activeLocation }) {
@@ -35,22 +36,45 @@ export default function NWPEnsembleSection({ activeLocation }) {
 
       {/* Ensemble Consensus & Instability Indices Card */}
       <div className="p-5 rounded-2xl bg-[#151b2a]/90 border border-white/10 space-y-3 shadow-inner">
-        <h3 className="text-base font-bold text-white font-['Outfit']">
-          Ensemble Consensus & Instability Indices
+        <h3 className="text-base font-bold text-white font-['Outfit'] flex items-center gap-2">
+          <span>Ensemble Consensus & Instability Indices</span>
         </h3>
         
         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
           {nwpData.synopticSummary || "Ensemble consensus displays strong alignment across GFS and ECMWF for 72-hour temperature progression with minor convective rainfall spread on Day 4."}
         </p>
 
-        {/* Instability Index Badges */}
+        {/* Instability Index Badges with Interactive Explanatory Hover Tooltips */}
         <div className="flex flex-wrap items-center gap-3 pt-1">
-          <span className="px-4 py-1.5 rounded-xl bg-[#3730a3] text-indigo-100 text-xs font-bold font-mono shadow-md border border-indigo-400/30">
-            CAPE: {nwpData.capeIndex || 1450} J/kg
-          </span>
-          <span className="px-4 py-1.5 rounded-xl bg-[#3730a3] text-indigo-100 text-xs font-bold font-mono shadow-md border border-indigo-400/30">
-            Lifted index {nwpData.liftedIndex || -3.2}
-          </span>
+          
+          {/* CAPE Tooltip */}
+          <div className="group relative">
+            <span className="px-4 py-1.5 rounded-xl bg-[#3730a3] hover:bg-[#4338ca] text-indigo-100 text-xs font-bold font-mono shadow-md border border-indigo-400/30 flex items-center gap-1.5 cursor-help transition-colors">
+              <span>CAPE: {nwpData.capeIndex || 1450} J/kg</span>
+              <HelpCircle className="w-3.5 h-3.5 opacity-70" />
+            </span>
+            
+            {/* Tooltip Popup */}
+            <div className="absolute bottom-full left-0 mb-2 w-64 p-2.5 rounded-2xl bg-[#090d16] border border-indigo-500/40 text-xs text-slate-200 shadow-2xl backdrop-blur-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+              <strong className="text-indigo-300 block mb-0.5">CAPE (Convective Energy):</strong>
+              Measures buoyant energy available to accelerate storm clouds. Values over 1000 J/kg indicate strong potential for thunderstorms and lightning.
+            </div>
+          </div>
+
+          {/* Lifted Index Tooltip */}
+          <div className="group relative">
+            <span className="px-4 py-1.5 rounded-xl bg-[#3730a3] hover:bg-[#4338ca] text-indigo-100 text-xs font-bold font-mono shadow-md border border-indigo-400/30 flex items-center gap-1.5 cursor-help transition-colors">
+              <span>Lifted index {nwpData.liftedIndex || -3.2}</span>
+              <HelpCircle className="w-3.5 h-3.5 opacity-70" />
+            </span>
+
+            {/* Tooltip Popup */}
+            <div className="absolute bottom-full left-0 mb-2 w-64 p-2.5 rounded-2xl bg-[#090d16] border border-indigo-500/40 text-xs text-slate-200 shadow-2xl backdrop-blur-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+              <strong className="text-indigo-300 block mb-0.5">Lifted Index (Air Stability):</strong>
+              Measures atmospheric stability. Negative values (below 0, such as -3.2) indicate unstable air likely to trigger sudden rains and showers.
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -60,69 +84,81 @@ export default function NWPEnsembleSection({ activeLocation }) {
           7-Day Deterministic Model Spread:
         </h3>
 
-        <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#111622]/90 shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs sm:text-sm">
-              <thead className="bg-[#090d16] text-slate-400 font-semibold border-b border-white/10">
-                <tr>
-                  <th className="p-4 text-slate-200">Forecast Date</th>
-                  <th className="p-4 text-cyan-400 font-bold">NOAA GFS (0.25°)</th>
-                  <th className="p-4 text-purple-400 font-bold">ECMWF IFS (9km)</th>
-                  <th className="p-4 text-emerald-400 font-bold">DWD ICON</th>
-                  <th className="p-4 text-amber-400 font-bold">IMD WRF (3km)</th>
-                  <th className="p-4 text-right text-slate-300">Spread / Confidence</th>
+        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#0d121f]">
+          <table className="w-full text-left text-xs sm:text-sm text-slate-200">
+            <thead className="bg-[#151b2a] text-slate-300 uppercase text-[11px] font-bold tracking-wider border-b border-white/10">
+              <tr>
+                <th className="px-4 py-3 font-mono">Forecast Date</th>
+                
+                {/* GFS Header with Tooltip */}
+                <th className="px-4 py-3 group relative cursor-help">
+                  <span className="border-b border-dotted border-slate-400">NOAA GFS (0.25°)</span>
+                  <div className="absolute bottom-full left-4 mb-2 hidden group-hover:block w-56 p-2 rounded-xl bg-slate-950 border border-white/20 text-[11px] text-slate-300 normal-case shadow-xl z-50">
+                    <strong>NOAA GFS:</strong> Global Forecast System (USA), 13km resolution, updated 4x daily.
+                  </div>
+                </th>
+
+                {/* ECMWF Header with Tooltip */}
+                <th className="px-4 py-3 group relative cursor-help">
+                  <span className="border-b border-dotted border-slate-400">ECMWF IFS (9km)</span>
+                  <div className="absolute bottom-full left-4 mb-2 hidden group-hover:block w-56 p-2 rounded-xl bg-slate-950 border border-white/20 text-[11px] text-slate-300 normal-case shadow-xl z-50">
+                    <strong>ECMWF IFS:</strong> European gold-standard 9km high-resolution global forecast.
+                  </div>
+                </th>
+
+                {/* ICON / WRF Header with Tooltip */}
+                <th className="px-4 py-3 group relative cursor-help">
+                  <span className="border-b border-dotted border-slate-400">DWD ICON / IMD WRF (3km)</span>
+                  <div className="absolute bottom-full left-4 mb-2 hidden group-hover:block w-56 p-2 rounded-xl bg-slate-950 border border-white/20 text-[11px] text-slate-300 normal-case shadow-xl z-50">
+                    <strong>DWD ICON & IMD WRF:</strong> High-resolution regional mesoscale models for Indian monsoon and convective tracking.
+                  </div>
+                </th>
+
+                {/* Spread Confidence Header */}
+                <th className="px-4 py-3 group relative cursor-help">
+                  <span className="border-b border-dotted border-slate-400">Spread / Confidence</span>
+                  <div className="absolute bottom-full right-4 mb-2 hidden group-hover:block w-56 p-2 rounded-xl bg-slate-950 border border-white/20 text-[11px] text-slate-300 normal-case shadow-xl z-50">
+                    <strong>Ensemble Spread:</strong> Difference between models. Lower spread indicates high forecast confidence.
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {nwpData.table?.map((row, idx) => (
+                <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                  <td className="px-4 py-3 font-semibold text-white">{row.date}</td>
+                  <td className="px-4 py-3 text-cyan-300">{row.gfs}</td>
+                  <td className="px-4 py-3 text-emerald-300">{row.ecmwf}</td>
+                  <td className="px-4 py-3 text-indigo-300">{row.wrf}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                      row.confidence === 'High' 
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                        : row.confidence === 'Moderate'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    }`}>
+                      {row.spread} ({row.confidence})
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 font-mono">
-                {nwpData.days.map((d, idx) => (
-                  <tr key={idx} className="hover:bg-white/5 transition-colors">
-                    <td className="p-4 font-sans font-medium text-slate-200">
-                      {d.day} <span className="text-[11px] text-slate-500 font-mono">({d.date})</span>
-                    </td>
-                    <td className="p-4 text-cyan-300 font-extrabold text-sm sm:text-base">
-                      {d.gfs?.tempMax ?? 32}°C
-                    </td>
-                    <td className="p-4 text-purple-300 font-extrabold text-sm sm:text-base">
-                      {d.ecmwf?.tempMax ?? 32.7}°C
-                    </td>
-                    <td className="p-4 text-emerald-300 font-extrabold text-sm sm:text-base">
-                      {d.icon?.tempMax ?? 31.6}°C
-                    </td>
-                    <td className="p-4 text-amber-300 font-extrabold text-sm sm:text-base">
-                      {d.wrf?.tempMax ?? 32.2}°C
-                    </td>
-                    <td className="p-4 text-right font-sans">
-                      <span className="text-xs px-2.5 py-1 rounded-lg bg-white/5 text-slate-300 border border-white/10 whitespace-nowrap">
-                        ±{d.tempSpread ?? 0.7}°C • {d.confidence ?? 'Very High (95%)'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* 4 NWP Model Summary Cards matching screenshot */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
-        {nwpData.models.map((m) => (
-          <div
-            key={m.id}
-            className="p-4 rounded-2xl bg-[#111622]/90 border border-white/10 hover:border-white/20 transition-all space-y-2 shadow-md"
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
-              <h4 className="text-sm font-bold text-white truncate font-['Outfit']">{m.name}</h4>
+      {/* 4 Model Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+        {nwpData.models?.map((model) => (
+          <div key={model.id} className="p-4 rounded-2xl bg-[#141926] border border-white/5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-white text-xs sm:text-sm font-['Outfit']">{model.name}</span>
+              <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                {model.resolution}
+              </span>
             </div>
-
-            <div className="space-y-1 text-xs text-slate-400">
-              <div>Res: <strong className="text-slate-200">{m.resolution}</strong></div>
-              <div>Update: <strong className="text-slate-200">{m.updateFreq}</strong></div>
-              <div className="text-[11px] text-slate-400 italic pt-1 line-clamp-3 leading-snug">
-                {m.specialty}
-              </div>
-            </div>
+            <p className="text-[11px] text-slate-400 line-clamp-2">{model.specialty}</p>
           </div>
         ))}
       </div>

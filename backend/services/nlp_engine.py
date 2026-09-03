@@ -175,23 +175,30 @@ def generate_personalized_response(clean_q: str, weather: Dict[str, Any], locati
         loc_hi = f"{raw_loc} में"
         loc_en = f"in {raw_loc}"
 
-    # Precise Rain Probability & Condition Assessment
-    daily_precip_prob = daily[0].get("precipProb", 20) if daily else 20
-    is_overcast_or_cloudy = any(k in cond.lower() for k in ["overcast", "cloud", "drizzle", "rain", "shower", "thunder"])
-    
-    # Calculate realistic rain chance
-    if any(k in cond.lower() for k in ["rain", "drizzle", "shower", "thunder"]):
-        rain_prob = max(daily_precip_prob, 85)
-        has_rain_threat = True
-    elif "overcast" in cond.lower():
-        rain_prob = max(daily_precip_prob, 65)
-        has_rain_threat = True
-    elif "cloud" in cond.lower() or hum > 80:
-        rain_prob = max(daily_precip_prob, 45)
-        has_rain_threat = True
+    # Live Synoptic Rain Probability from Open-Meteo
+    if daily and len(daily) > 0:
+        raw_prob = daily[0].get("precipProb", daily[0].get("precip_probability", 0))
     else:
-        rain_prob = daily_precip_prob
-        has_rain_threat = rain_prob > 35
+        raw_prob = 0
+
+    precip_val = c.get("precipitation", 0)
+    
+    # If active precipitation or rain code is occurring right now, probability is at least 85%
+    if precip_val > 0.1 or any(k in cond.lower() for k in ["rain", "drizzle", "shower", "thunder"]):
+        rain_prob = max(raw_prob, 85)
+        has_rain_threat = True
+    elif raw_prob > 0:
+        rain_prob = raw_prob
+        has_rain_threat = rain_prob >= 35
+    elif "overcast" in cond.lower():
+        rain_prob = 65
+        has_rain_threat = True
+    elif "cloud" in cond.lower():
+        rain_prob = 35
+        has_rain_threat = False
+    else:
+        rain_prob = 10
+        has_rain_threat = False
 
     # ------------------ INTENT 1: DRYING CLOTHES / LAUNDRY ------------------
     # Comprehensive Malayalam (Script + Manglish), Hindi, and English matching
