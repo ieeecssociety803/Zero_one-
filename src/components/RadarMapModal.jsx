@@ -49,7 +49,7 @@ export default function RadarMapModal({ isOpen, onClose, activeLocation }) {
 
       // RainViewer Live Doppler Radar Layer
       const radarLayer = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_0/256/{z}/{x}/{y}/2/1_1.png', {
-        opacity: 0.65,
+        opacity: 0.00,
         maxZoom: 18
       }).addTo(map);
 
@@ -66,7 +66,7 @@ export default function RadarMapModal({ isOpen, onClose, activeLocation }) {
     // Add Cyclone VARUNA Track
     if (showCycloneTrack) {
       const latlngs = CYCLONE_VARUNA_TRACK.map(pt => [pt.lat, pt.lon]);
-      
+
       // Track Polyline
       const trackLine = L.polyline(latlngs, {
         color: '#ef4444',
@@ -150,7 +150,7 @@ export default function RadarMapModal({ isOpen, onClose, activeLocation }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
       <div className="relative w-full max-w-5xl h-[88vh] glass-panel rounded-3xl border border-white/15 flex flex-col shadow-2xl overflow-hidden">
-        
+
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-900/80">
           <div className="flex items-center gap-3">
@@ -180,15 +180,14 @@ export default function RadarMapModal({ isOpen, onClose, activeLocation }) {
 
         {/* Radar Controls Toolbar */}
         <div className="px-6 py-2.5 bg-slate-950/90 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
-          
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCycloneTrack(!showCycloneTrack)}
-              className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
-                showCycloneTrack
+              className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${showCycloneTrack
                   ? 'bg-red-500/20 text-red-300 border-red-500/40 font-semibold'
                   : 'bg-slate-900 text-slate-400 border-white/5'
-              }`}
+                }`}
             >
               <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
               <span>Cyclone Track</span>
@@ -196,11 +195,10 @@ export default function RadarMapModal({ isOpen, onClose, activeLocation }) {
 
             <button
               onClick={() => setShowDWRStations(!showDWRStations)}
-              className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
-                showDWRStations
+              className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${showDWRStations
                   ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-semibold'
                   : 'bg-slate-900 text-slate-400 border-white/5'
-              }`}
+                }`}
             >
               <Radio className="w-3.5 h-3.5 text-cyan-400" />
               <span>DWR Stations</span>

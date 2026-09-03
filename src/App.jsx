@@ -6,6 +6,7 @@ import MetricsAdvisoriesGrid from './components/MetricsAdvisoriesGrid';
 import ChandraAIWidget from './components/ChandraAIWidget';
 import NWPEnsembleSection from './components/NWPEnsembleSection';
 import ERA5ClimateAnalyticsSection from './components/ERA5ClimateAnalyticsSection';
+import AdvancedDiagnosticsHub from './components/AdvancedDiagnosticsHub';
 import RadarMapModal from './components/RadarMapModal';
 import SectorAdvisoryModal from './components/SectorAdvisoryModal';
 import ClimateAnalyticsModal from './components/ClimateAnalyticsModal';
@@ -199,10 +200,13 @@ export default function App() {
           </div>
         )}
 
-        {/* Bottom Section 1: NWP Model Ensemble & Forecast Divergence Matrix */}
+        {/* Section 1: Synoptic Diagnostics & Environmental Telemetry Hub */}
+        <AdvancedDiagnosticsHub weatherData={weatherData} activeLocation={activeLocation} />
+
+        {/* Section 2: NWP Model Ensemble & Forecast Divergence Matrix */}
         <NWPEnsembleSection activeLocation={activeLocation} />
 
-        {/* Bottom Section 2: Copernicus ERA5 Climate Reanalysis & Interactive Meteorological Charts */}
+        {/* Section 3: Copernicus ERA5 Climate Reanalysis & Interactive Meteorological Charts */}
         <ERA5ClimateAnalyticsSection activeLocation={activeLocation} weatherData={weatherData} />
 
       </main>
