@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Languages, Mic, MicOff, Send, Volume2, VolumeX, Sparkles, User, Bot, Trash2, Check } from 'lucide-react';
+import { Languages, Send, Volume2, VolumeX, Sparkles, User, Bot, Trash2, Mic, MicOff } from 'lucide-react';
 import { SUPPORTED_LANGUAGES, UI_TRANSLATIONS, VoiceRecognition, speakText, stopSpeaking } from '../services/voiceService';
 import { processWeatherGPTQuery } from '../services/nlpReasoningEngine';
+import VoiceOrb from './VoiceOrb';
 
 export default function ChandraAIWidget({
   weatherData,
@@ -12,7 +13,8 @@ export default function ChandraAIWidget({
   apiKey,
   provider,
   externalQuery,
-  onClearExternalQuery
+  onClearExternalQuery,
+  accessibilityMode = 'standard'
 }) {
   const [inputQuery, setInputQuery] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -22,17 +24,27 @@ export default function ChandraAIWidget({
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
 
   const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === activeLanguage) || SUPPORTED_LANGUAGES[0];
-  const t = UI_TRANSLATIONS[activeLanguage] || UI_TRANSLATIONS.en;
+
+  const getInitialGreeting = (lang) => {
+    switch(lang) {
+      case 'ml':
+        return 'നമസ്കാരം! ഞാൻ ചന്ദ്ര. ഇന്നത്തെ മഴ, വെയിൽ, കാറ്റ്, യാത്ര അല്ലെങ്കിൽ കൃഷി കാര്യങ്ങൾ എന്തും ചോദിക്കൂ, പറഞ്ഞുതരാം!';
+      case 'hi':
+        return 'नमस्ते! मैं चन्द्रा हूँ। आज के मौसम, बारिश, खेती या यात्रा के बारे में बेझिझक पूछें!';
+      case 'ta':
+        return 'வணக்கம்! நான் சந்திரா. இன்றைய வானிலை, மழை, விவசாயம் அல்லது பயண ஆலோசனைகளுக்கு என்னிடம் கேளுங்கள்!';
+      case 'te':
+        return 'నమస్కారం! నేను చంద్ర. నేటి వాతావరణం, వర్షం లేదా వ్యవసాయ సలహాల కోసం నన్ను అడగండి!';
+      default:
+        return 'Hi! I am Chandra, your personal weather companion. Ask me anything about today\'s rain, clothing, workout, farming, or travel!';
+    }
+  };
 
   const [messages, setMessages] = useState([
     {
       id: 'init',
       role: 'assistant',
-      content: activeLanguage === 'ml'
-        ? 'നമസ്കാരം! ഞാൻ ചന്ദ്ര. ഇന്നത്തെ കാലാവസ്ഥ, മഴ, കൃഷി അല്ലെങ്കിൽ യാത്രാ സംശയങ്ങൾ എന്തും ചോദിക്കൂ.'
-        : activeLanguage === 'hi' 
-        ? 'नमस्ते! मैं चन्द्रा हूँ। आज के मौसम, बारिश, खेती या यात्रा के बारे में कुछ भी पूछें!'
-        : 'Hi! I am Chandra. Ask me for personalized advice on today\'s weather, rain, farming, or daily plans!',
+      content: getInitialGreeting(activeLanguage),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -41,7 +53,7 @@ export default function ChandraAIWidget({
   const messagesEndRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Initialize Speech Recognition for activeLanguage
+  // Re-initialize Speech Recognition when language changes
   useEffect(() => {
     voiceRecRef.current = new VoiceRecognition(
       currentLangObj.speechLang,
@@ -171,8 +183,8 @@ export default function ChandraAIWidget({
 
       setMessages(prev => [...prev, assistantMsg]);
 
-      // If user spoke by voice, read aloud the response
-      if (isListening) {
+      // If user spoke by voice or in cognitive/vision accessibility mode, automatically speak aloud
+      if (isListening || accessibilityMode === 'cognitive' || accessibilityMode === 'vision') {
         handleToggleSpeak(assistantMsg.id, cleanContent);
       }
     } catch (e) {
@@ -197,11 +209,7 @@ export default function ChandraAIWidget({
       {
         id: `init-${Date.now()}`,
         role: 'assistant',
-        content: activeLanguage === 'ml'
-          ? 'സംഭാഷണം പുനഃക്രമീകരിച്ചു. ഇന്നത്തെ കാലാവസ്ഥ, മഴ, കൃഷി എന്നിവയെക്കുറിച്ച് ചോദിക്കൂ!'
-          : activeLanguage === 'hi' 
-          ? 'वार्तालाप रीसेट हो गया है। आज के मौसम, फसल या यात्रा के बारे में पूछें!'
-          : 'Conversation reset. How can I help you with today\'s weather, farming, or plans?',
+        content: getInitialGreeting(activeLanguage),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
@@ -210,7 +218,9 @@ export default function ChandraAIWidget({
   const hasMultipleMessages = messages.length > 2;
 
   return (
-    <div className="relative w-full h-[380px] sm:h-[420px] rounded-2xl bg-[#0e131f]/95 border border-white/10 p-4 flex flex-col justify-between shadow-2xl overflow-hidden">
+    <div className={`relative w-full rounded-2xl bg-[#0e131f]/95 border border-white/10 p-4 flex flex-col justify-between shadow-2xl overflow-hidden transition-all ${
+      accessibilityMode === 'cognitive' ? 'h-[460px]' : 'h-[380px] sm:h-[420px]'
+    }`}>
       
       {/* Header with High Z-Index */}
       <div className="relative z-30 flex items-start justify-between pb-2 border-b border-white/5">
@@ -274,36 +284,21 @@ export default function ChandraAIWidget({
         </div>
       </div>
 
-      {/* Middle Content Area: Ethereal Animated Glowing Orb + In-Place Conversation Stream */}
-      <div className="relative z-10 flex-1 overflow-y-auto my-2 space-y-2.5 pr-1 scrollbar-thin flex flex-col">
+      {/* Middle Content Area: VoiceOrb + In-Place Conversation Stream */}
+      <div className="relative z-10 flex-1 overflow-y-auto my-2 space-y-3 pr-1 scrollbar-thin flex flex-col">
         
-        {/* Animated Glowing Holographic Orb (matching reference image) */}
-        <div className={`relative flex items-center justify-center transition-all duration-300 shrink-0 ${hasMultipleMessages ? 'py-1 scale-75 -my-2' : 'py-3'}`}>
-          <div className="relative flex items-center justify-center">
-            
-            {/* Ambient Radial Blue/Purple Neon Aura */}
-            <div className={`absolute w-32 h-32 rounded-full bg-gradient-to-tr from-blue-600/30 via-indigo-500/30 to-purple-600/30 blur-2xl ${isListening || isLoading ? 'animate-ping duration-1000' : 'animate-pulse'}`} />
-
-            {/* Glowing Celestial Sphere Container */}
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#030712] border border-blue-500/50 shadow-[0_0_35px_rgba(59,130,246,0.5),inset_0_0_20px_rgba(147,51,234,0.4)] overflow-hidden flex items-center justify-center">
-              
-              {/* Ethereal Spectral Curved Waves */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/40 via-purple-500/30 to-transparent rounded-full animate-spin [animation-duration:12s]" />
-              <div className="absolute -inset-1 bg-gradient-to-bl from-indigo-500/50 via-pink-500/30 to-transparent rounded-full animate-spin [animation-duration:8s] [animation-direction:reverse] opacity-80 mix-blend-screen" />
-              
-              {/* Central Glowing Wave Ribbon */}
-              <div className="relative w-20 h-20 rounded-full border-t-2 border-r-2 border-cyan-300/80 blur-[0.5px] rotate-45 animate-pulse" />
-              <div className="absolute w-16 h-16 rounded-full border-b-2 border-l-2 border-purple-400/80 blur-[0.5px] -rotate-12 animate-pulse [animation-delay:0.5s]" />
-              <div className="absolute w-12 h-12 rounded-full border-t border-l border-pink-400/60 blur-[0.3px] rotate-90" />
-
-              {/* Center Core Glimmer */}
-              <div className="absolute w-4 h-4 rounded-full bg-cyan-300/80 blur-sm animate-ping duration-1000" />
-            </div>
-          </div>
-        </div>
+        {/* Interactive VoiceOrb with Minimalist Voice Bar */}
+        <VoiceOrb
+          isListening={isListening}
+          isSpeaking={speakingMessageId !== null}
+          onToggleListen={toggleVoiceListening}
+          language={activeLanguage}
+          transcriptPreview={interimVoiceText}
+          hasSpeechSupport={true}
+        />
 
         {/* In-Place Message Stream */}
-        <div className="space-y-2 text-xs">
+        <div className="space-y-2 text-xs pt-1">
           {messages.map((msg) => {
             const isUser = msg.role === 'user';
             const isSpeaking = speakingMessageId === msg.id;
@@ -349,25 +344,13 @@ export default function ChandraAIWidget({
             );
           })}
 
-          {/* Thinking / Listening Status */}
+          {/* Thinking Status */}
           {isLoading && (
             <div className="flex items-center gap-1.5 text-[11px] text-cyan-300 p-2 bg-slate-900/70 rounded-xl border border-white/5">
               <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" />
               <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0.2s]" />
               <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0.4s]" />
               <span className="ml-1 text-slate-400">Chandra is thinking...</span>
-            </div>
-          )}
-
-          {isListening && (
-            <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-[11px] text-cyan-200 animate-pulse">
-              <div className="font-semibold flex items-center gap-1">
-                <Mic className="w-3 h-3 text-cyan-400 animate-bounce" />
-                <span>Listening in {currentLangObj.native}...</span>
-              </div>
-              <div className="text-[10px] text-cyan-300/80 italic mt-0.5">
-                {interimVoiceText || 'Speak your question...'}
-              </div>
             </div>
           )}
 
@@ -387,7 +370,7 @@ export default function ChandraAIWidget({
         >
           <input
             type="text"
-            placeholder={isListening ? "Listening... Speak now" : "Plan cultivation, workout, trip..."}
+            placeholder={isListening ? "Listening... Speak now" : "Ask about rain, farming, workouts..."}
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none px-1"
@@ -407,7 +390,7 @@ export default function ChandraAIWidget({
               onClick={toggleVoiceListening}
               className={`p-1.5 rounded-full transition-all ${
                 isListening
-                  ? 'bg-red-500 text-white animate-bounce shadow-lg shadow-red-500/50'
+                  ? 'bg-rose-500 text-white animate-bounce shadow-lg shadow-rose-500/50'
                   : 'text-slate-400 hover:text-cyan-400 hover:bg-white/5'
               }`}
               title={isListening ? "Stop listening" : "Speak to Chandra"}

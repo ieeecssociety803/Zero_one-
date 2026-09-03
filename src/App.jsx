@@ -13,13 +13,14 @@ import TechSpecsModal from './components/TechSpecsModal';
 import { fetchComprehensiveWeather, POPULAR_LOCATIONS } from './services/weatherApi';
 
 export default function App() {
-  // Default to Kochi, India as shown in user's design image or New Delhi
+  // Default to Kochi, India or New Delhi
   const [activeLocation, setActiveLocation] = useState(
     POPULAR_LOCATIONS.find(l => l.name === 'Kochi') || POPULAR_LOCATIONS[0]
   );
   const [weatherData, setWeatherData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeLanguage, setActiveLanguage] = useState('en');
+  const [accessibilityMode, setAccessibilityMode] = useState('standard'); // 'standard', 'cognitive', 'vision', 'hearing'
 
   // Modals state
   const [isRadarOpen, setIsRadarOpen] = useState(false);
@@ -76,9 +77,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className={`min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200 ${
+      accessibilityMode === 'vision' ? 'contrast-125 font-semibold text-white' : ''
+    }`}>
       
-      {/* 1. Top Navbar matching design */}
+      {/* 1. Top Navbar with Accessibility Dropdown */}
       <Navbar
         activeLocation={activeLocation}
         onSelectLocation={setActiveLocation}
@@ -86,9 +89,11 @@ export default function App() {
         onOpenClimate={() => setIsClimateOpen(true)}
         onOpenRadar={() => setIsRadarOpen(true)}
         onOpenTechSpecs={() => setIsTechSpecsOpen(true)}
+        accessibilityMode={accessibilityMode}
+        onChangeAccessibilityMode={setAccessibilityMode}
       />
 
-      {/* 2. Red Alert Warning Banner */}
+      {/* 2. Red Alert Warning Banner with Visual Accessibility Tags */}
       <DisasterTicker
         onOpenDisasterHub={() => setIsSectorsOpen(true)}
         locationName={activeLocation.name}
@@ -97,45 +102,103 @@ export default function App() {
       {/* Main Layout Container */}
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 flex-1">
         
-        {/* Top 3-Column Hero Grid matching user's design image */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-          
-          {/* Left Column: Interactive Map with India Default, Fly-to Zoom, Temp Pill Popup & Dynamic Condition Text */}
-          <div className="lg:col-span-4 flex flex-col">
-            <InteractiveWeatherMap
-              activeLocation={activeLocation}
-              weatherData={weatherData}
-              onOpenRadarModal={() => setIsRadarOpen(true)}
-            />
+        {/* Cognitive / Cerebral Incapacitance Mode: Voice First Layout */}
+        {accessibilityMode === 'cognitive' ? (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="p-4 rounded-3xl bg-amber-950/20 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between">
+              <span>🧠 <strong>Cerebral & Voice-First Mode Active:</strong> Chandra AI voice assistant is in focus with minimal simple weather metrics below.</span>
+              <button 
+                onClick={() => setAccessibilityMode('standard')} 
+                className="px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold"
+              >
+                Exit Mode
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Primary Voice Box */}
+              <div className="lg:col-span-8">
+                <ChandraAIWidget
+                  weatherData={weatherData}
+                  activeLocation={activeLocation}
+                  onSelectLocation={setActiveLocation}
+                  activeLanguage={activeLanguage}
+                  onChangeLanguage={setActiveLanguage}
+                  apiKey={apiKey}
+                  provider={provider}
+                  externalQuery={externalQuery}
+                  onClearExternalQuery={() => setExternalQuery(null)}
+                  accessibilityMode={accessibilityMode}
+                />
+              </div>
+
+              {/* Minimalist Summary Cards */}
+              <div className="lg:col-span-4 space-y-4">
+                <div className="p-6 rounded-3xl bg-[#0e131f] border border-white/15 text-center space-y-2 shadow-xl">
+                  <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">Current Temperature</div>
+                  <div className="text-5xl font-black text-cyan-300 font-['Outfit']">
+                    {weatherData?.current?.temperature || 27}° C
+                  </div>
+                  <div className="text-base font-semibold text-white">
+                    {weatherData?.current?.condition || 'Mainly Clear'}
+                  </div>
+                  <div className="text-xs text-slate-400 font-medium">
+                    {activeLocation.name}, {activeLocation.state || activeLocation.country}
+                  </div>
+                </div>
+
+                <MetricsAdvisoriesGrid
+                  weatherData={weatherData}
+                  onOpenAdvisoriesModal={() => setIsSectorsOpen(true)}
+                  onQuickQuery={handleQuickQuery}
+                  accessibilityMode={accessibilityMode}
+                />
+              </div>
+            </div>
           </div>
+        ) : (
+          /* Standard 3-Column Hero Grid matching user's design image */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            
+            {/* Left Column: Interactive Map with India Default, Fly-to Zoom, Temp Pill Popup & Dynamic Condition Text */}
+            <div className="lg:col-span-4 flex flex-col">
+              <InteractiveWeatherMap
+                activeLocation={activeLocation}
+                weatherData={weatherData}
+                onOpenRadarModal={() => setIsRadarOpen(true)}
+              />
+            </div>
 
-          {/* Middle Column: 3x3 Minimalist Metrics Grid + Expandable Advisories Card */}
-          <div className="lg:col-span-4 flex flex-col">
-            <MetricsAdvisoriesGrid
-              weatherData={weatherData}
-              onOpenAdvisoriesModal={() => setIsSectorsOpen(true)}
-              onQuickQuery={handleQuickQuery}
-            />
+            {/* Middle Column: 3x3 Minimalist Metrics Grid + Expandable Advisories Card */}
+            <div className="lg:col-span-4 flex flex-col">
+              <MetricsAdvisoriesGrid
+                weatherData={weatherData}
+                onOpenAdvisoriesModal={() => setIsSectorsOpen(true)}
+                onQuickQuery={handleQuickQuery}
+                accessibilityMode={accessibilityMode}
+              />
+            </div>
+
+            {/* Right Column: "Chandra" Multilingual Personal Weather AI with VoiceOrb */}
+            <div className="lg:col-span-4 flex flex-col">
+              <ChandraAIWidget
+                weatherData={weatherData}
+                activeLocation={activeLocation}
+                onSelectLocation={setActiveLocation}
+                activeLanguage={activeLanguage}
+                onChangeLanguage={setActiveLanguage}
+                apiKey={apiKey}
+                provider={provider}
+                externalQuery={externalQuery}
+                onClearExternalQuery={() => setExternalQuery(null)}
+                accessibilityMode={accessibilityMode}
+              />
+            </div>
+
           </div>
+        )}
 
-          {/* Right Column: "Chandra" Multilingual Personal Weather AI */}
-          <div className="lg:col-span-4 flex flex-col">
-            <ChandraAIWidget
-              weatherData={weatherData}
-              activeLocation={activeLocation}
-              onSelectLocation={setActiveLocation}
-              activeLanguage={activeLanguage}
-              onChangeLanguage={setActiveLanguage}
-              apiKey={apiKey}
-              provider={provider}
-              externalQuery={externalQuery}
-              onClearExternalQuery={() => setExternalQuery(null)}
-            />
-          </div>
-
-        </div>
-
-        {/* Bottom Section: NWP Model Ensemble & Forecast Divergence Matrix matching screenshot */}
+        {/* Bottom Section: NWP Model Ensemble & Forecast Divergence Matrix */}
         <NWPEnsembleSection activeLocation={activeLocation} />
 
       </main>

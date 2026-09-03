@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Navigation, Settings, Globe, Cpu, Sparkles } from 'lucide-react';
+import { Search, Navigation, Settings, Globe, Cpu, Accessibility, Eye, Volume2, Sparkles } from 'lucide-react';
 import { searchLocations, POPULAR_LOCATIONS } from '../services/weatherApi';
 
 export default function Navbar({
@@ -8,13 +8,18 @@ export default function Navbar({
   onOpenSettings,
   onOpenClimate,
   onOpenRadar,
-  onOpenTechSpecs
+  onOpenTechSpecs,
+  accessibilityMode,
+  onChangeAccessibilityMode
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAccessMenuOpen, setIsAccessMenuOpen] = useState(false);
+  
   const searchRef = useRef(null);
+  const accessRef = useRef(null);
 
   // Search logic
   useEffect(() => {
@@ -38,6 +43,9 @@ export default function Navbar({
     function handleClickOutside(e) {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
         setIsSearchOpen(false);
+      }
+      if (accessRef.current && !accessRef.current.contains(e.target)) {
+        setIsAccessMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -64,9 +72,18 @@ export default function Navbar({
     }
   };
 
+  const getAccessibilityLabel = () => {
+    switch (accessibilityMode) {
+      case 'cognitive': return '🧠 Voice-First Mode';
+      case 'vision': return '👁️ High Contrast';
+      case 'hearing': return '🦻 Visual Alert Mode';
+      default: return '♿ Accessibility';
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full bg-[#030712] border-b border-white/10 px-4 sm:px-6 lg:px-8 py-3">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
         
         {/* Brand Name matching screenshot: "WeatherGPT" */}
         <div 
@@ -137,6 +154,90 @@ export default function Navbar({
         {/* Action Controls */}
         <div className="flex items-center gap-2 shrink-0">
           
+          {/* Accessibility Mode Selector Dropdown */}
+          <div className="relative" ref={accessRef}>
+            <button
+              onClick={() => setIsAccessMenuOpen(!isAccessMenuOpen)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                accessibilityMode !== 'standard' 
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                  : 'bg-slate-900 border-white/10 text-slate-300 hover:text-white'
+              }`}
+              title="Select Accessibility Mode (Cerebral/Cognitive, Vision, Hearing)"
+            >
+              <Accessibility className="w-4 h-4 text-cyan-400" />
+              <span className="hidden md:inline">{getAccessibilityLabel()}</span>
+            </button>
+
+            {isAccessMenuOpen && (
+              <div className="absolute right-0 top-12 w-64 p-2 rounded-2xl bg-slate-900 border border-white/20 backdrop-blur-3xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 px-2.5 py-1 uppercase tracking-wider">
+                  Accessibility Preferences
+                </div>
+
+                <button
+                  onClick={() => {
+                    onChangeAccessibilityMode('standard');
+                    setIsAccessMenuOpen(false);
+                  }}
+                  className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all ${
+                    accessibilityMode === 'standard' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div>
+                    <div className="font-semibold">Standard Dashboard</div>
+                    <div className="text-[10px] text-slate-400">Full meteorological GIS & matrix</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onChangeAccessibilityMode('cognitive');
+                    setIsAccessMenuOpen(false);
+                  }}
+                  className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all ${
+                    accessibilityMode === 'cognitive' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div>
+                    <div className="font-semibold text-amber-300">🧠 Cerebral / Voice-First</div>
+                    <div className="text-[10px] text-slate-400">Primary voice interaction, minimal cards</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onChangeAccessibilityMode('vision');
+                    setIsAccessMenuOpen(false);
+                  }}
+                  className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all ${
+                    accessibilityMode === 'vision' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div>
+                    <div className="font-semibold text-emerald-300">👁️ High Contrast & TTS</div>
+                    <div className="text-[10px] text-slate-400">Bold contrast with auto audio readouts</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onChangeAccessibilityMode('hearing');
+                    setIsAccessMenuOpen(false);
+                  }}
+                  className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all ${
+                    accessibilityMode === 'hearing' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div>
+                    <div className="font-semibold text-rose-300">🦻 Visual Alert Mode</div>
+                    <div className="text-[10px] text-slate-400">Visual hazard badges & captions</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Tech Specs & Architecture Button */}
           <button
             onClick={onOpenTechSpecs}
@@ -144,14 +245,7 @@ export default function Navbar({
             title="View Languages, Frameworks, APIs, Algorithms & LLM Engine Specifications"
           >
             <Cpu className="w-4 h-4" />
-            <span className="hidden sm:inline">Tech Stack & Specs</span>
-          </button>
-
-          <button
-            onClick={onOpenClimate}
-            className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all"
-          >
-            <span>Climate ERA5</span>
+            <span className="hidden sm:inline">Tech Stack</span>
           </button>
 
           <button
