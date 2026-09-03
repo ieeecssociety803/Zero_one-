@@ -2,7 +2,6 @@
 export const getApiBase = () => {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-    // If running via LAN IP (e.g. 192.168.1.53 or 10.x.x.x), use that host on port 8000
     if (host && host !== 'localhost' && host !== '127.0.0.1') {
       return `http://${host}:8000/api`;
     }
@@ -30,7 +29,7 @@ export async function processWeatherGPTQuery({
   const cleanQuery = query.trim();
   const apiBase = getApiBase();
 
-  // 1. Attempt call to Python FastAPI Backend (Works across both Desktop and Mobile over LAN)
+  // 1. Attempt call to Python FastAPI Backend
   try {
     const res = await fetch(`${apiBase}/chat`, {
       method: 'POST',
@@ -45,7 +44,7 @@ export async function processWeatherGPTQuery({
         api_key: apiKey,
         provider: provider
       }),
-      signal: AbortSignal.timeout(4000) // 4 second timeout
+      signal: AbortSignal.timeout(4000)
     });
 
     if (res.ok) {
@@ -53,17 +52,13 @@ export async function processWeatherGPTQuery({
       return data;
     }
   } catch (err) {
-    console.warn('Backend chat unreachable from current device, executing client personalized NLP:', err);
+    console.warn('Backend unreachable from current device, executing client personalized NLP:', err);
   }
 
-  // 2. High-Fidelity Client-Side Personalized NLP Engine (Guarantees deep personalization on Mobile as well!)
+  // 2. High-Fidelity Client-Side Personalized NLP Engine
   return generateClientPersonalizedResponse(cleanQuery, currentWeatherData, activeLocation, activeLanguage);
 }
 
-/**
- * Client-side mirrored Personalized NLP Engine (Exact parity with Python engine)
- * Ensures Mobile never falls back to generic raw data dumps!
- */
 function generateClientPersonalizedResponse(query, weatherData, activeLocation, lang) {
   const cleanQ = query.toLowerCase();
   const c = weatherData?.current || {};
@@ -85,8 +80,7 @@ function generateClientPersonalizedResponse(query, weatherData, activeLocation, 
     ? 'here in your area'
     : `in ${rawLoc}`;
 
-  const dailyPrecip = daily[0]?.precipProb || 20;
-  const isCloudy = /overcast|cloud|drizzle|rain|shower|thunder/i.test(cond);
+  const dailyPrecip = daily[0]?.precipProb ?? daily[0]?.precip_probability ?? 20;
   
   let rainProb = dailyPrecip;
   let hasRainThreat = false;
@@ -109,7 +103,7 @@ function generateClientPersonalizedResponse(query, weatherData, activeLocation, 
     if (lang === 'ml') {
       const text = hasRainThreat
         ? `${loc_ml} ഇപ്പോൾ ആകാശം കാർമേഘാവൃതമാണ് (${cond}), ${rainProb}% മഴയ്ക്ക് സാധ്യതയുണ്ട്. അതുകൊണ്ട് തുണികൾ പുറത്ത് ഉണങ്ങാനിടുന്നത് ഒഴിവാക്കുക. തുണികൾ നനഞ്ഞുപോകാൻ സാധ്യതയുള്ളതിനാൽ വീട്ടിനുള്ളിൽ ഉണക്കുന്നതാണ് സുരക്ഷിതം.`
-        : `${loc_ml} ഇന്ന് നല്ല വെയിലും തെളിഞ്ഞ ആകാശവുമാണ്, മഴയ്ക്ക് സാധ്യത വളരെ കുറവാണ് (${rainProb}%). തുണികൾ പുറത്തിട്ട് വേഗത്തിൽ ഉണക്കിയെടുക്കാൻ ഇന്ന് വളരെ അനുയോജ്യമായ ദിവസമാണ്.`;
+        : `${loc_ml} ഇന്ന് നല്ല വെയിലും തെളിഞ്ഞ ആകാശവുമാണ്, മഴയ്ക്ക് സാധ്യത വളരെ കുറവാണ് ({rainProb}%). തുണികൾ പുറത്തിട്ട് വേഗത്തിൽ ഉണക്കിയെടുക്കാൻ ഇന്ന് വളരെ അനുയോജ്യമായ ദിവസമാണ്.`;
       return { type: 'laundry', text };
     } else if (lang === 'hi') {
       const text = hasRainThreat

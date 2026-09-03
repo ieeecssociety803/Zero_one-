@@ -11,14 +11,14 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી', speechLang: 'gu-IN', flag: '🦁' },
   { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ', speechLang: 'kn-IN', flag: '🐘' },
   { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', speechLang: 'pa-IN', flag: '🌾' },
-  { code: 'or', name: 'Odia', native: 'ଓଡ଼ିଆ', speechLang: 'or-IN', flag: '🛕' },
+  { code: 'or', name: 'Odia', native: 'ଓଡ଼ിଆ', speechLang: 'or-IN', flag: '🛕' },
   { code: 'ur', name: 'Urdu', native: 'اردو', speechLang: 'ur-IN', flag: '🌙' },
 ];
 
 export const UI_TRANSLATIONS = {
   en: {
     voicePrompt: 'Tap to speak your question in English or Malayalam',
-    listening: 'Listening...',
+    listening: 'Listening... Speak into microphone',
     speaking: 'Chandra is speaking...',
     thinking: 'Chandra is analyzing...',
     advisories: 'Advisories',
@@ -26,8 +26,8 @@ export const UI_TRANSLATIONS = {
     searchPlaceholder: 'Search city, station (e.g. Kochi, India)...'
   },
   ml: {
-    voicePrompt: 'മലയാളത്തിലോ ഇംഗ്ലീഷിലോ സംസാരിക്കാൻ ടാപ്പ് ചെയ്യുക',
-    listening: 'കേൾക്കുന്നു...',
+    voicePrompt: 'സംസാരിക്കാൻ ടാപ്പ് ചെയ്യുക (മലയാളം / English)',
+    listening: 'കേൾക്കുന്നു... ചോദിക്കൂ...',
     speaking: 'ചന്ദ്ര സംസാരിക്കുന്നു...',
     thinking: 'ചന്ദ്ര ചിന്തിക്കുന്നു...',
     advisories: 'നിർദ്ദേശങ്ങൾ',
@@ -35,8 +35,8 @@ export const UI_TRANSLATIONS = {
     searchPlaceholder: 'സ്ഥലം തിരയുക (ഉദാ: കൊച്ചി, തൃശ്ശൂർ)...'
   },
   hi: {
-    voicePrompt: 'हिन्दी या अंग्रेजी में बोलने के लिए टैप करें',
-    listening: 'सुन रहे हैं...',
+    voicePrompt: 'बोलने के लिए टैप करें (हिन्दी / English)',
+    listening: 'सुन रहे हैं... बोलिए...',
     speaking: 'चन्द्रा बोल रही है...',
     thinking: 'चन्द्रा सोच रही है...',
     advisories: 'सलाहकार',
@@ -44,8 +44,8 @@ export const UI_TRANSLATIONS = {
     searchPlaceholder: 'शहर खोजें (उदा: दिल्ली, कोच्चि)...'
   },
   ta: {
-    voicePrompt: 'தமிழில் பேச தட்டவும்',
-    listening: 'கேட்கிறது...',
+    voicePrompt: 'பேச தட்டவும் (தமிழ் / English)',
+    listening: 'கேட்கிறது... பேசுங்கள்...',
     speaking: 'சந்திரா பேசுகிறார்...',
     thinking: 'சந்திரா சிந்திக்கிறார்...',
     advisories: 'ஆலோசனைகள்',
@@ -72,7 +72,8 @@ export function stopSpeaking() {
 }
 
 /**
- * Foolproof Multilingual Text-To-Speech with dynamic host support
+ * Foolproof Multilingual Text-To-Speech
+ * Uses backend gTTS audio stream for instant, 100% natural pronunciation in Malayalam/Hindi/Tamil
  */
 export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {}) {
   stopSpeaking();
@@ -83,7 +84,6 @@ export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {
 
   const targetLang = lang.toLowerCase();
 
-  // Dynamic host determination so audio plays on both desktop and mobile
   const host = window.location.hostname || '127.0.0.1';
   const backendHost = (host !== 'localhost' && host !== '127.0.0.1') ? host : '127.0.0.1';
 
@@ -107,14 +107,13 @@ export function speakText(text, lang = 'en', onStart = () => {}, onEnd = () => {
 
       const playPromise = currentAudio.play();
       if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn('Autoplay restricted, falling back to speech synthesis:', err);
+        playPromise.catch(() => {
           fallbackSpeechSynthesis(clean, targetLang, onStart, onEnd);
         });
       }
       return;
     } catch (e) {
-      console.warn('Backend TTS error, falling back:', e);
+      console.warn('Backend TTS error:', e);
     }
   }
 
@@ -152,8 +151,8 @@ function fallbackSpeechSynthesis(cleanText, targetLang, onStart, onEnd) {
 }
 
 /**
- * Clean Non-Glitching Voice Recognition (STT) for Desktop and Mobile
- * Avoids browser re-entry permission flicker loops
+ * Robust Speech Recognition with Active Session Window (STT)
+ * Keeps listening stably for up to 8 seconds so desktop & mobile do not abruptly stop after 1 second
  */
 export class VoiceRecognition {
   constructor(lang = 'en-IN', onResult, onError, onEnd) {
@@ -163,11 +162,14 @@ export class VoiceRecognition {
     this.onResult = onResult;
     this.onError = onError;
     this.onEnd = onEnd;
+    this.sessionEndTime = 0;
+    this.collectedTranscript = '';
+    this.autoStopTimer = null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = false; // Clean single-session prevents desktop permission flicker
+      this.recognition.continuous = false;
       this.recognition.interimResults = true;
       this.recognition.lang = lang;
 
@@ -183,20 +185,33 @@ export class VoiceRecognition {
           }
         }
 
-        const currentText = finalTranscript || interimTranscript;
-        if (this.onResult && currentText) {
-          this.onResult(currentText, Boolean(finalTranscript));
+        const currentText = (finalTranscript || interimTranscript).trim();
+        if (currentText) {
+          this.collectedTranscript = currentText;
+          if (this.onResult) {
+            this.onResult(currentText, Boolean(finalTranscript));
+          }
         }
       };
 
       this.recognition.onerror = (err) => {
-        console.warn('Speech recognition status:', err.error);
-        this.isListening = false;
-        if (this.onError) this.onError(err);
+        console.warn('Speech recognition event:', err.error);
+        // Do not crash session on no-speech
       };
 
       this.recognition.onend = () => {
+        const now = Date.now();
+        // If user is still in active listening session (< 8s) and hasn't produced a final speech, keep session alive
+        if (this.isListening && now < this.sessionEndTime && !this.collectedTranscript) {
+          try {
+            this.recognition.start();
+            return;
+          } catch (e) {}
+        }
+
+        // If we collected a transcript or session timed out, complete cleanly
         this.isListening = false;
+        if (this.autoStopTimer) clearTimeout(this.autoStopTimer);
         if (this.onEnd) this.onEnd();
       };
     }
@@ -204,12 +219,22 @@ export class VoiceRecognition {
 
   start() {
     if (!this.recognition) return false;
-    if (this.isListening) return true;
+    this.collectedTranscript = '';
+    this.isListening = true;
+    this.sessionEndTime = Date.now() + 8000; // 8-second listening window
 
     try {
       this.recognition.lang = this.lang;
       this.recognition.start();
-      this.isListening = true;
+      
+      // Auto-stop after 8 seconds of listening
+      if (this.autoStopTimer) clearTimeout(this.autoStopTimer);
+      this.autoStopTimer = setTimeout(() => {
+        if (this.isListening) {
+          this.stop();
+        }
+      }, 8000);
+
       return true;
     } catch (e) {
       if (e.name === 'InvalidStateError') {
@@ -223,6 +248,8 @@ export class VoiceRecognition {
   }
 
   stop() {
+    this.sessionEndTime = 0;
+    if (this.autoStopTimer) clearTimeout(this.autoStopTimer);
     if (this.recognition && this.isListening) {
       try {
         this.recognition.stop();
