@@ -82,7 +82,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-gradient-to-b from-[#030712] via-[#030712]/85 to-transparent backdrop-blur-md px-4 sm:px-6 lg:px-8 pt-3 pb-4">
+    <header className="sticky top-0 z-40 w-full bg-[#030712] border-b border-white/10 px-4 sm:px-6 lg:px-8 py-3">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
         
         {/* Brand Name matching screenshot: "WeatherGPT" */}
